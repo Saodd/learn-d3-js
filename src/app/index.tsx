@@ -36,7 +36,7 @@ export function App(): JSX.Element {
   );
 }
 
-const aapl: { date: Date; close: number }[] = [
+const aapl: { date: Date; close: number; open?: number }[] = [
   {
     date: new Date('2007-04-16'),
     close: 10,
@@ -44,18 +44,22 @@ const aapl: { date: Date; close: number }[] = [
   {
     date: new Date('2007-04-17'),
     close: 10,
+    open: -10,
   },
   {
     date: new Date('2007-04-18'),
     close: 10,
+    open: 8,
   },
   {
     date: new Date('2007-04-19'),
     close: 10,
+    open: 12,
   },
   {
     date: new Date('2007-04-20'),
     close: 10,
+    open: 10,
   },
   {
     date: new Date('2007-04-21'),
@@ -112,6 +116,10 @@ function LineChart(elem: SVGSVGElement): void {
     .attr('height', c.height)
     .attr('viewBox', [0, 0, c.width, c.height]);
 
+  // 线条数据
+  const line1_series = d3.map(data, (d) => d.close);
+  const line2_series = d3.map(data, (d) => d.open);
+
   // 画 X轴
   const x_series = d3.map(data, (d) => d.date);
   const x_domain = d3.extent(x_series);
@@ -127,7 +135,7 @@ function LineChart(elem: SVGSVGElement): void {
 
   // 画 Y轴
   const y_series = d3.map(data, (d) => d.close);
-  const y_domain = d3.extent([0, d3.max(y_series)]);
+  const y_domain = d3.extent([...d3.extent(line1_series), ...d3.extent(line2_series)]);
   const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]);
   const y_axis = d3.axisLeft(y_scale).ticks(c.height / 40, null);
   svg
@@ -142,14 +150,14 @@ function LineChart(elem: SVGSVGElement): void {
         .attr('stroke-opacity', 0.1);
     });
 
-  // 画 一条线
-  const line_defined = d3.map(data, (d) => d.date && !isNaN(d.close));
+  // 画 第一条线
+  const line1_defined = d3.map(data, (d) => d.date && !isNaN(d.close));
   const line = d3
     .line<number>()
-    .defined((i) => line_defined[i])
+    .defined((i) => line1_defined[i])
     .curve(d3.curveLinear)
     .x((i) => x_scale(x_series[i]))
-    .y((i) => y_scale(y_series[i]));
+    .y((i) => y_scale(line1_series[i]));
   svg
     .append('path')
     .attr('fill', 'none')
@@ -158,6 +166,23 @@ function LineChart(elem: SVGSVGElement): void {
     .attr('stroke-linejoin', c.strokeLinejoin)
     .attr('stroke-linecap', c.strokeLinecap)
     .attr('d', line(d3.map(data, (_, i) => i)));
+
+  // 画 第二条线
+  const line2_defined = d3.map(data, (d) => d.date && !isNaN(d.open));
+  const line2 = d3
+    .line<number>()
+    .defined((i) => line2_defined[i])
+    .curve(d3.curveLinear)
+    .x((i) => x_scale(x_series[i]))
+    .y((i) => y_scale(line2_series[i]));
+  svg
+    .append('path')
+    .attr('fill', 'none')
+    .attr('stroke', 'red')
+    .attr('stroke-width', c.strokeWidth)
+    .attr('stroke-linejoin', c.strokeLinejoin)
+    .attr('stroke-linecap', c.strokeLinecap)
+    .attr('d', line2(d3.map(data, (_, i) => i)));
 }
 
 // Copyright 2021 Observable, Inc.

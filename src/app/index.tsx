@@ -110,7 +110,6 @@ function LineChart(elem: SVGSVGElement): void {
 
   const x_series = d3.map(data, (d) => d.date);
   const x_domain = d3.extent(x_series);
-
   const xAxis = d3
     .axisBottom(d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]))
     .ticks(c.width / 80, d3.timeFormat('%m-%d'))
@@ -119,6 +118,23 @@ function LineChart(elem: SVGSVGElement): void {
     .append('g')
     .attr('transform', `translate(0,${c.height - c.marginBottom})`)
     .call(xAxis);
+
+  const y_series = d3.map(data, (d) => d.close);
+  const y_domain = d3.extent([0, d3.max(y_series)]);
+  const yAxis = d3
+    .axisLeft(d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]))
+    .ticks(c.height / 40, null);
+  svg
+    .append('g')
+    .attr('transform', `translate(${c.marginLeft},0)`)
+    .call(yAxis)
+    .call((g) => g.select('.domain').remove())
+    .call((g) => {
+      g.selectAll('.tick line')
+        .clone()
+        .attr('x2', c.width - c.marginLeft - c.marginRight)
+        .attr('stroke-opacity', 0.1);
+    });
 }
 
 // Copyright 2021 Observable, Inc.

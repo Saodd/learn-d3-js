@@ -97,6 +97,10 @@ const config = {
   marginRight: 30, // right margin, in pixels
   marginBottom: 30, // bottom margin, in pixels
   marginLeft: 40, // left margin, in pixels
+  color: 'currentColor', // stroke color of line
+  strokeWidth: 1.5, // stroke width of line, in pixels
+  strokeLinejoin: 'round', // stroke line join of line
+  strokeLinecap: 'round', // stroke line cap of line
 };
 
 function LineChart(elem: SVGSVGElement): void {
@@ -108,10 +112,12 @@ function LineChart(elem: SVGSVGElement): void {
     .attr('height', c.height)
     .attr('viewBox', [0, 0, c.width, c.height]);
 
+  // 画 X轴
   const x_series = d3.map(data, (d) => d.date);
   const x_domain = d3.extent(x_series);
+  const x_scale = d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]);
   const xAxis = d3
-    .axisBottom(d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]))
+    .axisBottom(x_scale)
     .ticks(c.width / 80, d3.timeFormat('%m-%d'))
     .tickSizeOuter(0);
   svg
@@ -119,15 +125,15 @@ function LineChart(elem: SVGSVGElement): void {
     .attr('transform', `translate(0,${c.height - c.marginBottom})`)
     .call(xAxis);
 
+  // 画 Y轴
   const y_series = d3.map(data, (d) => d.close);
   const y_domain = d3.extent([0, d3.max(y_series)]);
-  const yAxis = d3
-    .axisLeft(d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]))
-    .ticks(c.height / 40, null);
+  const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]);
+  const y_axis = d3.axisLeft(y_scale).ticks(c.height / 40, null);
   svg
     .append('g')
     .attr('transform', `translate(${c.marginLeft},0)`)
-    .call(yAxis)
+    .call(y_axis)
     .call((g) => g.select('.domain').remove())
     .call((g) => {
       g.selectAll('.tick line')
@@ -135,6 +141,23 @@ function LineChart(elem: SVGSVGElement): void {
         .attr('x2', c.width - c.marginLeft - c.marginRight)
         .attr('stroke-opacity', 0.1);
     });
+
+  // 画 一条线
+  const line_defined = d3.map(data, (d) => d.date && !isNaN(d.close));
+  const line = d3
+    .line<number>()
+    .defined((i) => line_defined[i])
+    .curve(d3.curveLinear)
+    .x((i) => x_scale(x_series[i]))
+    .y((i) => y_scale(y_series[i]));
+  svg
+    .append('path')
+    .attr('fill', 'none')
+    .attr('stroke', c.color)
+    .attr('stroke-width', c.strokeWidth)
+    .attr('stroke-linejoin', c.strokeLinejoin)
+    .attr('stroke-linecap', c.strokeLinecap)
+    .attr('d', line(d3.map(data, (_, i) => i)));
 }
 
 // Copyright 2021 Observable, Inc.

@@ -5,8 +5,10 @@ import { useEffect, useRef } from 'react';
 
 export function App(): JSX.Element {
   const ref = useRef<SVGSVGElement>(null);
+  const ref2 = useRef<SVGSVGElement>(null);
   useEffect(() => {
-    LineChart(
+    LineChart(ref.current);
+    LineChart0(
       aapl,
       {
         x: (d) => d.date,
@@ -16,7 +18,7 @@ export function App(): JSX.Element {
         height: 500,
         color: 'steelblue',
       },
-      ref.current,
+      ref2.current,
     );
   }, []);
 
@@ -24,14 +26,45 @@ export function App(): JSX.Element {
     <div id={'app'}>
       <p className={styles.myClass}>Hello, Lewin!</p>
       <p>当前版本为{__NPM_VERSION__}</p>
-      <div style={{ padding: '50px' }}>
+      <div style={{ border: '1px solid black' }}>
         <svg ref={ref} />
+      </div>
+      <div style={{ border: '1px solid black' }}>
+        <svg ref={ref2} />
       </div>
     </div>
   );
 }
 
-const aapl = [
+const aapl: { date: Date; close: number }[] = [
+  {
+    date: new Date('2007-04-16'),
+    close: 10,
+  },
+  {
+    date: new Date('2007-04-17'),
+    close: 10,
+  },
+  {
+    date: new Date('2007-04-18'),
+    close: 10,
+  },
+  {
+    date: new Date('2007-04-19'),
+    close: 10,
+  },
+  {
+    date: new Date('2007-04-20'),
+    close: 10,
+  },
+  {
+    date: new Date('2007-04-21'),
+    close: 10,
+  },
+  {
+    date: new Date('2007-04-22'),
+    close: 10,
+  },
   {
     date: new Date('2007-04-23'),
     close: 93.24,
@@ -57,11 +90,41 @@ const aapl = [
     close: 97,
   },
 ];
+const config = {
+  width: 500,
+  height: 500,
+  marginTop: 20, // top margin, in pixels
+  marginRight: 30, // right margin, in pixels
+  marginBottom: 30, // bottom margin, in pixels
+  marginLeft: 40, // left margin, in pixels
+};
+
+function LineChart(elem: SVGSVGElement): void {
+  const data = aapl;
+  const c = config;
+  const svg = d3
+    .select(elem)
+    .attr('width', c.width)
+    .attr('height', c.height)
+    .attr('viewBox', [0, 0, c.width, c.height]);
+
+  const x_series = d3.map(data, (d) => d.date);
+  const x_domain = d3.extent(x_series);
+
+  const xAxis = d3
+    .axisBottom(d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]))
+    .ticks(c.width / 80, d3.timeFormat('%m-%d'))
+    .tickSizeOuter(0);
+  svg
+    .append('g')
+    .attr('transform', `translate(0,${c.height - c.marginBottom})`)
+    .call(xAxis);
+}
 
 // Copyright 2021 Observable, Inc.
 // Released under the ISC license.
 // https://observablehq.com/@d3/line-with-tooltip
-function LineChart(
+function LineChart0(
   data: { date: Date; close: number }[],
   {
     x = ([x]) => x, // given d in data, returns the (temporal) x-value
@@ -97,7 +160,6 @@ function LineChart(
 ) {
   // Compute values.
   const X = d3.map(data, x);
-  console.log('X', X);
   const Y = d3.map(data, y);
   const O = d3.map(data, (d) => d);
   const I = d3.map(data, (_, i) => i);

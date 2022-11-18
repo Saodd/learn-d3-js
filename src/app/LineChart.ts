@@ -73,7 +73,7 @@ export function LineChart(elem: SVGSVGElement): void {
   const line = d3
     .line<number>()
     .defined((i) => line1_defined[i])
-    .curve(d3.curveLinear)
+    .curve(d3.curveCardinal) // https://github.com/d3/d3/blob/main/API.md#curves
     .x((i) => x_scale(x_series[i]))
     .y((i) => y_scale(line1_series[i]));
   const line1_path = lines_group

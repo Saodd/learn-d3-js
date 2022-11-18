@@ -24,6 +24,16 @@ export function LineChart(elem: SVGSVGElement): void {
     .attr('viewBox', [0, 0, c.width, c.height]);
 
   // 线条数据
+  const lines_clip = svg
+    .append('defs')
+    .append('svg:clipPath')
+    .attr('id', 'lines_clip')
+    .append('svg:rect')
+    .attr('x', c.marginLeft)
+    .attr('y', c.marginTop)
+    .attr('width', c.width - c.marginLeft - c.marginRight)
+    .attr('height', c.height - c.marginTop - c.marginBottom);
+  const lines_group = svg.append('g').attr('clip-path', 'url(#lines_clip)');
   const line1_series = d3.map(data, (d) => d.close);
   const line2_series = d3.map(data, (d) => d.open);
 
@@ -66,7 +76,7 @@ export function LineChart(elem: SVGSVGElement): void {
     .curve(d3.curveLinear)
     .x((i) => x_scale(x_series[i]))
     .y((i) => y_scale(line1_series[i]));
-  svg
+  lines_group
     .append('path')
     .attr('fill', 'none')
     .attr('stroke', c.color)
@@ -83,7 +93,7 @@ export function LineChart(elem: SVGSVGElement): void {
     .curve(d3.curveLinear)
     .x((i) => x_scale(x_series[i]))
     .y((i) => y_scale(line2_series[i]));
-  svg
+  lines_group
     .append('path')
     .attr('fill', 'none')
     .attr('stroke', 'red')

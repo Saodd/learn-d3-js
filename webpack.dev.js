@@ -16,9 +16,9 @@ module.exports = merge(common, {
   ],
   devServer: {
     host: '0.0.0.0',
-    port: 8080,
+    port: 3000,
     client: {
-      webSocketURL: 'ws://localhost:8080/ws',
+      webSocketURL: 'ws://localhost:3000/ws',
     },
     historyApiFallback: {
       disableDotRule: true,

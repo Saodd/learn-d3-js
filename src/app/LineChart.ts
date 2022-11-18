@@ -29,10 +29,10 @@ export function LineChart(elem: SVGSVGElement): void {
     .append('svg:clipPath')
     .attr('id', 'lines_clip')
     .append('svg:rect')
-    .attr('x', c.marginLeft)
-    .attr('y', c.marginTop)
-    .attr('width', c.width - c.marginLeft - c.marginRight)
-    .attr('height', c.height - c.marginTop - c.marginBottom);
+    .attr('x', c.marginLeft - 5)
+    .attr('y', c.marginTop - 5)
+    .attr('width', c.width - c.marginLeft - c.marginRight + 10)
+    .attr('height', c.height - c.marginTop - c.marginBottom + 5);
   const lines_group = svg.append('g').attr('clip-path', 'url(#lines_clip)');
   const line1_series = d3.map(data, (d) => d.close);
   const line2_series = d3.map(data, (d) => d.open);
@@ -173,4 +173,32 @@ export function LineChart(elem: SVGSVGElement): void {
     .on('pointerenter pointermove', onPointerMove)
     .on('pointerleave', onPointerLeave)
     .on('touchstart', (event) => event.preventDefault());
+
+  /**
+   * 画 线条上的数字
+   */
+  const line1_points_group = lines_group
+    .append('g')
+    .attr('font-family', 'sans-serif')
+    .attr('font-size', 10)
+    .attr('text-anchor', 'middle')
+    .attr('stroke-linejoin', 'round')
+    .attr('stroke-linecap', 'round');
+  line1_points_group
+    .selectAll('text')
+    .data(line1_series)
+    .join('text')
+    .attr('dy', '0.35em')
+    .attr('x', (_, index) => x_scale(x_series[index]))
+    .attr('y', (value) => y_scale(value))
+    .text((i) => i);
+  const line2_points_group = line1_points_group.clone();
+  line2_points_group
+    .selectAll('text')
+    .data(line2_series)
+    .join('text')
+    .attr('dy', '0.35em')
+    .attr('x', (_, index) => x_scale(x_series[index]))
+    .attr('y', (value) => y_scale(value))
+    .text((i) => i);
 }

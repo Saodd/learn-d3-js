@@ -43,7 +43,7 @@ export function LineChart(elem: SVGSVGElement): void {
 
   // 画 Y轴
   // const y_series = d3.map(data, (d) => d.close);
-  const y_domain = d3.extent([...d3.extent(line1_series), ...d3.extent(line2_series)]);
+  const y_domain = d3.extent([0, d3.max([d3.max(line1_series), d3.max(line2_series)])]);
   const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]);
   const y_axis = d3.axisLeft(y_scale).ticks(c.height / 40, null);
   svg
@@ -95,16 +95,30 @@ export function LineChart(elem: SVGSVGElement): void {
   /**
    * 画 tooltip
    */
-  const tooltip = svg.append('g').style('pointer-events', 'none');
+  const focus = svg.append('g');
+  const focus_tooltip = focus.append('g').style('pointer-events', 'none');
+  const focus_line = focus
+    .append('line')
+    .attr('stroke', '#B74779')
+    .attr('stroke-width', '1px')
+    .attr('stroke-dasharray', '3,3')
+    .attr('y1', 0)
+    .attr('y2', c.height);
 
   const onPointerMove = (event: PointerEvent) => {
-    const x_index = d3.bisectCenter(x_series, x_scale.invert(d3.pointer(event)[0]));
-    tooltip.style('display', null);
-    tooltip.attr('transform', `translate(${x_scale(x_series[x_index])},${y_scale(line1_series[x_index])})`);
+    const pointer = d3.pointer(event);
+    const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]));
+    focus.attr('transform', `translate(${x_scale(x_series[x_index])},0)`);
+    focus.style('display', null);
 
-    const path = tooltip.selectAll('path').data([undefined]).join('path').attr('fill', 'white').attr('stroke', 'black');
+    const path = focus_tooltip
+      .selectAll('path')
+      .data([undefined])
+      .join('path')
+      .attr('fill', 'white')
+      .attr('stroke', 'black');
 
-    const text = tooltip
+    const text = focus_tooltip
       .selectAll<SVGTextElement, null>('text')
       .data([undefined])
       .join('text')
@@ -121,14 +135,16 @@ export function LineChart(elem: SVGSVGElement): void {
 
     const { x, y, width: w, height: h } = text.node().getBBox(); // 根据text的实际尺寸来计算外边框的尺寸和位置
     text.attr('transform', `translate(${-w / 2},${15 - y})`);
-    path.attr('d', `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+    path.attr('d', `M${-w / 2 - 10},5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+    focus_tooltip.attr('transform', `translate(${w / 2 + 20},${pointer[1]})`);
     // svg.property('value', line1_series[x_index]).dispatch('input', { bubbles: true });
   };
 
   const onPointerLeave = () => {
-    tooltip.style('display', 'none');
+    focus.style('display', 'none');
     // svg.property('value', null).dispatch('input', { bubbles: true });
   };
+  onPointerLeave();
   svg
     .on('pointerenter pointermove', onPointerMove)
     .on('pointerleave', onPointerLeave)

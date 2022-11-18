@@ -16,7 +16,7 @@ module.exports = {
   },
   plugins: [
     new HtmlWebpackPlugin({
-      title: 'Project Template: React',
+      title: 'Learn d3.js',
       template: './src/index.html',
       favicon: './src/favicon.ico',
       chunks: ['index'],

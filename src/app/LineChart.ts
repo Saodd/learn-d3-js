@@ -76,7 +76,7 @@ export function LineChart(elem: SVGSVGElement): void {
     .curve(d3.curveLinear)
     .x((i) => x_scale(x_series[i]))
     .y((i) => y_scale(line1_series[i]));
-  lines_group
+  const line1_path = lines_group
     .append('path')
     .attr('fill', 'none')
     .attr('stroke', c.color)
@@ -84,6 +84,13 @@ export function LineChart(elem: SVGSVGElement): void {
     .attr('stroke-linejoin', c.strokeLinejoin)
     .attr('stroke-linecap', c.strokeLinecap)
     .attr('d', line(d3.map(data, (_, i) => i)));
+  line1_path
+    .on('pointerenter pointermove', () => {
+      line1_path.attr('stroke-width', c.strokeWidth * 2);
+    })
+    .on('pointerleave', () => {
+      line1_path.attr('stroke-width', c.strokeWidth);
+    });
 
   // 画 第二条线
   const line2_defined = d3.map(data, (d) => d.date && !isNaN(d.open));
@@ -93,7 +100,7 @@ export function LineChart(elem: SVGSVGElement): void {
     .curve(d3.curveLinear)
     .x((i) => x_scale(x_series[i]))
     .y((i) => y_scale(line2_series[i]));
-  lines_group
+  const line2_path = lines_group
     .append('path')
     .attr('fill', 'none')
     .attr('stroke', 'red')
@@ -101,6 +108,13 @@ export function LineChart(elem: SVGSVGElement): void {
     .attr('stroke-linejoin', c.strokeLinejoin)
     .attr('stroke-linecap', c.strokeLinecap)
     .attr('d', line2(d3.map(data, (_, i) => i)));
+  line2_path
+    .on('pointerenter pointermove', () => {
+      line2_path.attr('stroke-width', c.strokeWidth * 2);
+    })
+    .on('pointerleave', () => {
+      line2_path.attr('stroke-width', c.strokeWidth);
+    });
 
   /**
    * 画 tooltip

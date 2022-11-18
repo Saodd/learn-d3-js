@@ -26,7 +26,7 @@ export function App(): JSX.Element {
     <div id={'app'}>
       <p className={styles.myClass}>Hello, Lewin!</p>
       <p>当前版本为{__NPM_VERSION__}</p>
-      <div style={{ border: '1px solid black' }}>
+      <div style={{ border: '1px solid black', fontSize: '12px' }}>
         <svg ref={ref} />
       </div>
       <div style={{ border: '1px solid black' }}>
@@ -124,9 +124,10 @@ function LineChart(elem: SVGSVGElement): void {
   const x_series = d3.map(data, (d) => d.date);
   const x_domain = d3.extent(x_series);
   const x_scale = d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]);
+  const x_format = d3.timeFormat('%m-%d');
   const xAxis = d3
     .axisBottom(x_scale)
-    .ticks(c.width / 80, d3.timeFormat('%m-%d'))
+    .ticks(c.width / 80, x_format)
     .tickSizeOuter(0);
   svg
     .append('g')
@@ -134,7 +135,7 @@ function LineChart(elem: SVGSVGElement): void {
     .call(xAxis);
 
   // 画 Y轴
-  const y_series = d3.map(data, (d) => d.close);
+  // const y_series = d3.map(data, (d) => d.close);
   const y_domain = d3.extent([...d3.extent(line1_series), ...d3.extent(line2_series)]);
   const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]);
   const y_axis = d3.axisLeft(y_scale).ticks(c.height / 40, null);
@@ -183,6 +184,48 @@ function LineChart(elem: SVGSVGElement): void {
     .attr('stroke-linejoin', c.strokeLinejoin)
     .attr('stroke-linecap', c.strokeLinecap)
     .attr('d', line2(d3.map(data, (_, i) => i)));
+
+  /**
+   * 画 tooltip
+   */
+  const tooltip = svg.append('g').style('pointer-events', 'none');
+
+  const onPointerMove = (event: PointerEvent) => {
+    const x_index = d3.bisectCenter(x_series, x_scale.invert(d3.pointer(event)[0]));
+    tooltip.style('display', null);
+    tooltip.attr('transform', `translate(${x_scale(x_series[x_index])},${y_scale(line1_series[x_index])})`);
+
+    const path = tooltip.selectAll('path').data([undefined]).join('path').attr('fill', 'white').attr('stroke', 'black');
+
+    const text = tooltip
+      .selectAll<SVGTextElement, null>('text')
+      .data([undefined])
+      .join('text')
+      .call((text) =>
+        text
+          .selectAll('tspan')
+          .data([x_format(x_series[x_index]), line1_series[x_index], line2_series[x_index]])
+          .join('tspan')
+          .attr('x', 0)
+          .attr('y', (_, i) => `${i * 1.1}em`)
+          .attr('font-weight', (_, i) => (i ? null : 'bold'))
+          .text((d) => d),
+      );
+
+    const { x, y, width: w, height: h } = text.node().getBBox(); // 根据text的实际尺寸来计算外边框的尺寸和位置
+    text.attr('transform', `translate(${-w / 2},${15 - y})`);
+    path.attr('d', `M${-w / 2 - 10},5H-5l5,-5l5,5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+    // svg.property('value', line1_series[x_index]).dispatch('input', { bubbles: true });
+  };
+
+  const onPointerLeave = () => {
+    tooltip.style('display', 'none');
+    // svg.property('value', null).dispatch('input', { bubbles: true });
+  };
+  svg
+    .on('pointerenter pointermove', onPointerMove)
+    .on('pointerleave', onPointerLeave)
+    .on('touchstart', (event) => event.preventDefault());
 }
 
 // Copyright 2021 Observable, Inc.

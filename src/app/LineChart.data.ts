@@ -1,4 +1,4 @@
-export const aapl: { date: Date; close: number; open?: number }[] = [
+export const aapl: { date: Date; close: number; open?: number; action1?: number; action2?: number }[] = [
   {
     date: new Date('2007-04-16'),
     close: 10,
@@ -22,14 +22,18 @@ export const aapl: { date: Date; close: number; open?: number }[] = [
     date: new Date('2007-04-20'),
     close: 10,
     open: 10,
+    action1: 1,
   },
   {
     date: new Date('2007-04-21'),
     close: 10,
+    action2: 1,
   },
   {
     date: new Date('2007-04-22'),
     close: 10,
+    action1: 2,
+    action2: 1,
   },
   {
     date: new Date('2007-04-23'),

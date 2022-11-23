@@ -52,6 +52,7 @@ export class LineChart {
 
   private line1_series: number[];
   private line2_series: number[];
+  private part1_y_scale: d3.ScaleLinear<number, number, never>;
   private render_Part1(): void {
     const { svg, data, config, x_series, x_scale } = this;
     const { marginLeft, marginRight, marginTop, marginBottom, width, height, heightPart2 } = config;
@@ -81,7 +82,7 @@ export class LineChart {
      * 画 Y轴
      */
     const y_domain = d3.extent([0, d3.max([d3.max(line1_series), d3.max(line2_series)])]);
-    const y_scale = d3.scaleLinear(y_domain, [height - marginBottom - heightPart2, marginTop]);
+    const y_scale = (this.part1_y_scale = d3.scaleLinear(y_domain, [height - marginBottom - heightPart2, marginTop]));
     const y_axis = d3.axisLeft(y_scale).ticks(height / 50, null);
     svg
       .append('g')
@@ -149,7 +150,7 @@ export class LineChart {
   }
 
   private render_tooltip(): void {
-    const { svg, config: c, x_series, x_scale, x_format, line1_series, line2_series } = this;
+    const { svg, config: c, x_series, x_scale, x_format, line1_series, line2_series, part1_y_scale } = this;
 
     const focus = svg.append('g');
     const focus_line = focus
@@ -159,13 +160,28 @@ export class LineChart {
       // .attr('stroke-dasharray', '3,3')
       .attr('y1', 0)
       .attr('y2', c.height);
+    const focus_points = focus.append('g');
     const focus_tooltip = focus.append('g').style('pointer-events', 'none');
 
     const onPointerMove = (event: PointerEvent) => {
+      focus.style('display', null);
       const pointer = d3.pointer(event);
       const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]));
-      focus.style('display', null);
-      focus_line.attr('transform', `translate(${x_scale(x_series[x_index])},0)`);
+      const x_line_position = x_scale(x_series[x_index]);
+      focus_line.attr('transform', `translate(${x_line_position},0)`);
+      focus_points
+        .selectAll('.focus-pointer')
+        .data<{ y: number }>(
+          [line1_series[x_index], line2_series[x_index]].filter((y) => !!y).map((y) => ({ y: part1_y_scale(y) })),
+        )
+        .join('circle') // enter append
+        .attr('class', 'focus-pointer')
+        .attr('fill', 'white')
+        .attr('stroke-width', '1')
+        .attr('stroke', 'blue')
+        .attr('r', '2') // radius
+        .attr('cx', x_line_position) // center x passing through your xScale
+        .attr('cy', (d) => d.y); // center y through your yScale;
 
       const path = focus_tooltip
         .selectAll('path')
@@ -207,33 +223,3 @@ export class LineChart {
       .on('touchstart', (event) => event.preventDefault());
   }
 }
-
-// export function _LineChart(elem: SVGSVGElement): void {
-//   /**
-//    * 画 线条上的数字
-//    */
-//   const line1_points_group = lines_group
-//     .append('g')
-//     .attr('font-family', 'sans-serif')
-//     .style('font-size', 10)
-//     .attr('text-anchor', 'middle')
-//     .attr('stroke-linejoin', 'round')
-//     .attr('stroke-linecap', 'round');
-//   line1_points_group
-//     .selectAll('text')
-//     .data(line1_series)
-//     .join('text')
-//     .attr('dy', '0.35em')
-//     .attr('x', (_, index) => x_scale(x_series[index]))
-//     .attr('y', (value) => y_scale(value))
-//     .text((i) => i);
-//   const line2_points_group = line1_points_group.clone();
-//   line2_points_group
-//     .selectAll('text')
-//     .data(line2_series)
-//     .join('text')
-//     .attr('dy', '0.35em')
-//     .attr('x', (_, index) => x_scale(x_series[index]))
-//     .attr('y', (value) => y_scale(value))
-//     .text((i) => i);
-// }

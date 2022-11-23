@@ -1,49 +1,66 @@
 import * as d3 from 'd3';
-import { aapl } from './LineChart.data';
 
-const config = {
-  width: 500,
-  height: 300,
-  heightPart2: 80,
-  marginTop: 20, // top margin, in pixels
-  marginRight: 30, // right margin, in pixels
-  marginBottom: 30, // bottom margin, in pixels
-  marginLeft: 40, // left margin, in pixels
-  color: 'currentColor', // stroke color of line
-  strokeWidth: 1.5, // stroke width of line, in pixels
-  strokeLinejoin: 'round', // stroke line join of line
-  strokeLinecap: 'round', // stroke line cap of line
+type LineChartConfig = {
+  width: number;
+  height: number;
+  marginTop: number;
+  marginRight: number;
+  marginBottom: number;
+  marginLeft: number;
+};
+type LineChartDataItem = {
+  timestamp: number; // 毫秒
+};
+export type LineChartData<ItemType extends LineChartDataItem = LineChartDataItem> = {
+  items: ItemType[];
+  part1: {
+    title: string;
+    color: string;
+    extractor: (item: ItemType) => number;
+    formatter: (value: number) => string;
+  }[];
+  part2: {
+    title: string;
+    color: string;
+    extractor: (item: ItemType) => number;
+    formatter: (value: number) => string;
+  }[];
 };
 
-export class LineChart {
-  config = config;
-  data = aapl;
-  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+const Part2_LineHeight = 50;
+const Part2_MarginTop = 50;
 
-  constructor(elem: SVGSVGElement) {
-    const { width, height } = this.config;
-    this.svg = d3.select(elem).attr('width', width).attr('height', height).attr('viewBox', [0, 0, width, height]);
+export class LineChart<DataType extends LineChartData> {
+  config: LineChartConfig;
+  data: DataType;
+
+  constructor(data: DataType) {
+    this.data = data;
   }
 
-  render(): void {
+  private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  render(elem: SVGSVGElement, config: LineChartConfig): void {
+    const { width, height } = (this.config = config);
+    this.svg = d3.select(elem).attr('width', width).attr('height', height).attr('viewBox', [0, 0, width, height]);
+
     this.render_xAxis();
     this.render_Part1();
     this.render_Part2();
-    this.render_tooltip();
+    this.render_focus();
   }
 
-  private x_series: Date[];
+  private x_series: number[];
   private x_scale: d3.ScaleTime<number, number, never>;
-  private x_format: (date: Date) => string;
+  private x_format: (date: Date | number) => string;
   private render_xAxis(): void {
     const { svg, data, config } = this;
     const { marginLeft, marginRight, marginBottom, width, height } = config;
 
-    const x_series = (this.x_series = d3.map(data, (d) => d.date));
-    const x_domain = d3.extent(x_series);
-    const x_scale = (this.x_scale = d3.scaleUtc(x_domain, [marginLeft, width - marginRight]));
-    const x_format = (this.x_format = d3.timeFormat('%m-%d'));
-    const xAxis = d3.axisBottom(x_scale).ticks(width / 50, x_format);
+    const x_series = (this.x_series = data.items.map((item) => item.timestamp));
+    const x_scale = (this.x_scale = d3.scaleTime(d3.extent(x_series), [marginLeft, width - marginRight]));
+    const x_format = (this.x_format = d3.timeFormat('%H:%M'));
+    const defaultTick = ~~(width / 50);
+    const xAxis = d3.axisBottom(x_scale).ticks(x_series.length <= defaultTick ? d3.timeMinute : defaultTick, x_format);
     svg
       .append('g')
       .attr('transform', `translate(0,${height - marginBottom})`)
@@ -51,18 +68,18 @@ export class LineChart {
       .call(xAxis);
   }
 
-  private line1_series: number[];
-  private line2_series: number[];
+  private part1_series: number[][];
   private part1_y_scale: d3.ScaleLinear<number, number, never>;
   private render_Part1(): void {
-    const { svg, data, config, x_series, x_scale } = this;
-    const { marginLeft, marginRight, marginTop, marginBottom, width, height, heightPart2 } = config;
-    const c = config;
+    const { data, config: c, x_series, x_scale } = this;
+    const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
+    const part1 = this.svg.append('g');
 
     /**
      * 裁剪区域
      */
-    const lines_clip = svg
+    const part1_bottom = height - marginBottom - Part2_LineHeight * data.part2.length - Part2_MarginTop;
+    const lines_clip = part1
       .append('defs')
       .append('svg:clipPath')
       .attr('id', 'lines_clip')
@@ -70,22 +87,21 @@ export class LineChart {
       .attr('x', marginLeft)
       .attr('y', marginTop)
       .attr('width', width - marginLeft - marginRight)
-      .attr('height', height - marginTop - marginBottom - heightPart2);
-    const lines_group = svg.append('g').attr('clip-path', 'url(#lines_clip)');
+      .attr('height', part1_bottom - marginTop);
+    const lines_group = part1.append('g').attr('clip-path', 'url(#lines_clip)');
 
     /**
      * 线条数据
      */
-    const line1_series = (this.line1_series = d3.map(data, (d) => d.close));
-    const line2_series = (this.line2_series = d3.map(data, (d) => d.open));
+    const part1_series = (this.part1_series = data.part1.map((line) => data.items.map(line.extractor)));
 
     /**
      * 画 Y轴
      */
-    const y_domain = d3.extent([0, d3.max([d3.max(line1_series), d3.max(line2_series)])]);
-    const y_scale = (this.part1_y_scale = d3.scaleLinear(y_domain, [height - marginBottom - heightPart2, marginTop]));
+    const y_domain = d3.extent([0, d3.max([d3.max(part1_series.map((s) => d3.max(s))) * 1.1, 10])]);
+    const y_scale = (this.part1_y_scale = d3.scaleLinear(y_domain, [part1_bottom, marginTop]));
     const y_axis = d3.axisLeft(y_scale).ticks(height / 50, null);
-    svg
+    part1
       .append('g')
       .attr('transform', `translate(${marginLeft},0)`)
       .call(y_axis)
@@ -98,141 +114,94 @@ export class LineChart {
       });
 
     /**
-     * 画 第一条线
+     * 画 线
      */
-    const line1_defined = d3.map(data, (d) => d.date && !isNaN(d.close));
-    const line = d3
-      .line<number>()
-      .defined((i) => line1_defined[i])
-      .curve(d3.curveLinear) // https://github.com/d3/d3/blob/main/API.md#curves
-      .x((i) => x_scale(x_series[i]))
-      .y((i) => y_scale(line1_series[i]));
-    const line1_path = lines_group
-      .append('path')
-      .attr('fill', 'none')
-      .attr('stroke', c.color)
-      .attr('stroke-width', c.strokeWidth)
-      .attr('stroke-linejoin', c.strokeLinejoin)
-      .attr('stroke-linecap', c.strokeLinecap)
-      .attr('d', line(d3.map(data, (_, i) => i)));
-    line1_path
-      .on('pointerenter pointermove', () => {
-        line1_path.attr('stroke-width', c.strokeWidth * 2);
-      })
-      .on('pointerleave', () => {
-        line1_path.attr('stroke-width', c.strokeWidth);
-      });
-
-    /**
-     * 画 第二条线
-     */
-    const line2_defined = d3.map(data, (d) => d.date && !isNaN(d.open));
-    const line2 = d3
-      .line<number>()
-      .defined((i) => line2_defined[i])
-      .curve(d3.curveLinear)
-      .x((i) => x_scale(x_series[i]))
-      .y((i) => y_scale(line2_series[i]));
-    const line2_path = lines_group
-      .append('path')
-      .attr('fill', 'none')
-      .attr('stroke', 'red')
-      .attr('stroke-width', c.strokeWidth)
-      .attr('stroke-linejoin', c.strokeLinejoin)
-      .attr('stroke-linecap', c.strokeLinecap)
-      .attr('d', line2(d3.map(data, (_, i) => i)));
-    line2_path
-      .on('pointerenter pointermove', () => {
-        line2_path.attr('stroke-width', c.strokeWidth * 2);
-      })
-      .on('pointerleave', () => {
-        line2_path.attr('stroke-width', c.strokeWidth);
-      });
+    part1_series.forEach((seriesData, index) => {
+      const defaultStrokeWidth = 1.5;
+      const seriesConfig = data.part1[index];
+      const line_defined = d3.map(seriesData, (d) => !isNaN(d));
+      const line = d3
+        .line<number>()
+        .defined((i) => line_defined[i])
+        .curve(d3.curveLinear) // https://github.com/d3/d3/blob/main/API.md#curves
+        .x((i) => x_scale(x_series[i]))
+        .y((i) => y_scale(seriesData[i]));
+      const line1_path = lines_group
+        .append('path')
+        .attr('fill', 'none')
+        .attr('stroke', seriesConfig.color)
+        .attr('stroke-width', defaultStrokeWidth)
+        .attr('stroke-linejoin', 'round')
+        .attr('stroke-linecap', 'round')
+        .attr('d', line(seriesData.map((_, i) => i)));
+      line1_path
+        .on('pointerenter pointermove', () => {
+          line1_path.attr('stroke-width', defaultStrokeWidth * 2);
+        })
+        .on('pointerleave', () => {
+          line1_path.attr('stroke-width', defaultStrokeWidth);
+        });
+    });
   }
 
-  private scatter1_series: number[];
-  private scatter2_series: number[];
+  private part2_series: number[][];
   private render_Part2(): void {
     const { data, config: c, x_series, x_scale } = this;
-    const { marginLeft, marginRight, marginTop, marginBottom, width, height, heightPart2 } = c;
+    const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
     const part2 = this.svg.append('g');
 
     /**
      * 散点数据
      */
-    const series1: { v: number; i: number }[] = (this.scatter1_series = data.map((d) => d.action1)).reduce(
-      (prev, v, i) => {
-        if (v) prev.push({ v, i });
-        return prev;
-      },
-      [],
-    );
-    const series2: { v: number; i: number }[] = (this.scatter2_series = data.map((d) => d.action2)).reduce(
-      (prev, v, i) => {
-        if (v) prev.push({ v, i });
-        return prev;
-      },
-      [],
-    );
+    this.part2_series = data.part2.map((line) => data.items.map(line.extractor));
+    const part2_series = this.part2_series.map((seriesData) => {
+      const points: { v: number; i: number }[] = [];
+      seriesData.forEach((v, i) => {
+        if (v) points.push({ v, i });
+      });
+      return points;
+    });
 
     /**
      * 画 Y轴
      */
-    const y_specifier = ['改价格', '改库存'];
-    const y_top = height - marginBottom - heightPart2;
-    const y_tick_height = heightPart2 / y_specifier.length;
-    const y_scale = d3.scaleLinear([0, 2], [height - marginBottom, y_top]);
+    const part2_length = data.part2.length;
+    const part2_top = height - marginBottom - part2_length * Part2_LineHeight;
+    const part2_bottom = height - marginBottom;
+    const y_scale = d3.scaleLinear([0, part2_length], [part2_bottom, part2_top]);
     const y_axis = d3
       .axisLeft(y_scale)
-      .tickValues([0, 1]) // https://stackoverflow.com/questions/44872048/d3-js-how-can-i-create-an-axis-with-custom-labels-and-customs-ticks
-      .tickFormat((v) => y_specifier[v.valueOf()]);
+      .tickValues(data.part2.map((_, i) => i)) // https://stackoverflow.com/questions/44872048/d3-js-how-can-i-create-an-axis-with-custom-labels-and-customs-ticks
+      .tickFormat((v) => data.part2[v.valueOf()].title);
     part2
       .append('g')
       .attr('transform', `translate(${marginLeft},0)`)
       .call(y_axis)
-      .call((g) => g.selectAll('.tick text').attr('transform', `translate(0,-${y_tick_height / 2})`));
+      .call((g) => g.selectAll('.tick text').attr('transform', `translate(0,-${Part2_LineHeight / 2})`));
 
     /**
      * 画 散点
      * https://d3-graph-gallery.com/graph/scatter_basic.html
      */
-    part2
-      .append('g')
-      .attr('transform', `translate(0,-${y_tick_height / 2})`)
-      .selectAll('circle')
-      .data(series1)
-      .join('circle')
-      .attr('cx', (item) => x_scale(x_series[item.i]))
-      .attr('cy', y_scale(0))
-      .attr('r', 3)
-      .style('fill', '#69b3a2');
-    part2
-      .append('g')
-      .attr('transform', `translate(0,-${y_tick_height / 2})`)
-      .selectAll('circle')
-      .data(series2)
-      .join('circle')
-      .attr('cx', (item) => x_scale(x_series[item.i]))
-      .attr('cy', y_scale(1))
-      .attr('r', 3)
-      .style('fill', '#69b3a2');
+    part2_series.forEach((seriesData, index) => {
+      const seriesConfig = data.part2[index];
+      part2
+        .append('g')
+        .attr('transform', `translate(0,-${Part2_LineHeight / 2})`)
+        .selectAll('circle')
+        .data(seriesData)
+        .join('circle')
+        .attr('cx', (item) => x_scale(x_series[item.i]))
+        .attr('cy', y_scale(index))
+        .attr('r', 3)
+        .style('fill', seriesConfig.color);
+    });
   }
 
-  private render_tooltip(): void {
-    const {
-      svg,
-      config: c,
-      x_series,
-      x_scale,
-      x_format,
-      line1_series,
-      line2_series,
-      part1_y_scale,
-      scatter1_series,
-      scatter2_series,
-    } = this;
+  private render_focus(): void {
+    const { data, config: c, x_series, x_scale, x_format, part1_series, part2_series, part1_y_scale } = this;
+    const focus = this.svg.append('g');
 
-    const focus = svg.append('g');
     const focus_line = focus
       .append('line')
       .attr('stroke', '#B74779')
@@ -245,20 +214,23 @@ export class LineChart {
     const onPointerMove = (event: PointerEvent) => {
       focus.style('display', null);
       const pointer = d3.pointer(event);
-      const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]));
+      const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]).valueOf());
       const x_line_position = x_scale(x_series[x_index]);
       focus_line.attr('transform', `translate(${x_line_position},0)`);
       focus_points
         .selectAll('.focus-pointer')
         .data<{ y: number }>(
-          [line1_series[x_index], line2_series[x_index]].filter((y) => !!y).map((y) => ({ y: part1_y_scale(y) })),
+          part1_series
+            .map((s) => s[x_index])
+            .filter((y) => !!y)
+            .map((y) => ({ y: part1_y_scale(y) })),
         )
         .join('circle') // enter append
         .attr('class', 'focus-pointer')
         .attr('fill', 'white')
         .attr('stroke-width', '1')
-        .attr('stroke', 'blue')
-        .attr('r', '2') // radius
+        .attr('stroke', 'black')
+        .attr('r', '4') // radius
         .attr('cx', x_line_position) // center x passing through your xScale
         .attr('cy', (d) => d.y); // center y through your yScale;
 
@@ -279,10 +251,19 @@ export class LineChart {
             .data(
               [
                 x_format(x_series[x_index]),
-                line1_series[x_index] ? '收盘价: ' + line1_series[x_index] : null,
-                line2_series[x_index] ? '开盘价: ' + line2_series[x_index] : null,
-                `改价: ${scatter1_series[x_index] || 0}次`,
-                `改库存: ${scatter2_series[x_index] || 0}次`,
+                ...part1_series.map((s, index) => {
+                  const value = s[x_index];
+                  if (value) {
+                    const seriesConfig = data.part1[index];
+                    return `${seriesConfig.title}: ${seriesConfig.formatter(value)}`;
+                  }
+                  return null;
+                }),
+                ...part2_series.map((s, index) => {
+                  const value = s[x_index];
+                  const seriesConfig = data.part2[index];
+                  return `${seriesConfig.title}: ${seriesConfig.formatter(value || 0)}`;
+                }),
               ].filter((v) => !!v),
             )
             .join('tspan')
@@ -304,7 +285,7 @@ export class LineChart {
       // svg.property('value', null).dispatch('input', { bubbles: true });
     };
     onPointerLeave();
-    svg
+    this.svg
       .on('pointerenter pointermove', onPointerMove)
       .on('pointerleave', onPointerLeave)
       .on('touchstart', (event) => event.preventDefault());

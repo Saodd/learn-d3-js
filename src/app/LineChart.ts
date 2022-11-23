@@ -3,7 +3,8 @@ import { aapl } from './LineChart.data';
 
 const config = {
   width: 500,
-  height: 500,
+  height: 300,
+  heightPartBottom: 100,
   marginTop: 20, // top margin, in pixels
   marginRight: 30, // right margin, in pixels
   marginBottom: 30, // bottom margin, in pixels
@@ -32,7 +33,7 @@ export function LineChart(elem: SVGSVGElement): void {
     .attr('x', c.marginLeft - 5)
     .attr('y', c.marginTop - 5)
     .attr('width', c.width - c.marginLeft - c.marginRight + 10)
-    .attr('height', c.height - c.marginTop - c.marginBottom + 5);
+    .attr('height', c.height - c.marginTop - c.marginBottom - c.heightPartBottom + 10);
   const lines_group = svg.append('g').attr('clip-path', 'url(#lines_clip)');
   const line1_series = d3.map(data, (d) => d.close);
   const line2_series = d3.map(data, (d) => d.open);
@@ -42,20 +43,19 @@ export function LineChart(elem: SVGSVGElement): void {
   const x_domain = d3.extent(x_series);
   const x_scale = d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]);
   const x_format = d3.timeFormat('%m-%d');
-  const xAxis = d3
-    .axisBottom(x_scale)
-    .ticks(c.width / 80, x_format)
-    .tickSizeOuter(0);
+  const xAxis = d3.axisBottom(x_scale).ticks(c.width / 50, x_format);
+  // .tickSizeOuter(0);
   svg
     .append('g')
     .attr('transform', `translate(0,${c.height - c.marginBottom})`)
+    .style('font-size', 10)
     .call(xAxis);
 
   // 画 Y轴
   // const y_series = d3.map(data, (d) => d.close);
   const y_domain = d3.extent([0, d3.max([d3.max(line1_series), d3.max(line2_series)])]);
-  const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom, c.marginTop]);
-  const y_axis = d3.axisLeft(y_scale).ticks(c.height / 40, null);
+  const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom - c.heightPartBottom, c.marginTop]);
+  const y_axis = d3.axisLeft(y_scale).ticks(c.height / 50, null);
   svg
     .append('g')
     .attr('transform', `translate(${c.marginLeft},0)`)
@@ -180,7 +180,7 @@ export function LineChart(elem: SVGSVGElement): void {
   const line1_points_group = lines_group
     .append('g')
     .attr('font-family', 'sans-serif')
-    .attr('font-size', 10)
+    .style('font-size', 10)
     .attr('text-anchor', 'middle')
     .attr('stroke-linejoin', 'round')
     .attr('stroke-linecap', 'round');

@@ -219,7 +219,18 @@ export class LineChart {
   }
 
   private render_tooltip(): void {
-    const { svg, config: c, x_series, x_scale, x_format, line1_series, line2_series, part1_y_scale } = this;
+    const {
+      svg,
+      config: c,
+      x_series,
+      x_scale,
+      x_format,
+      line1_series,
+      line2_series,
+      part1_y_scale,
+      scatter1_series,
+      scatter2_series,
+    } = this;
 
     const focus = svg.append('g');
     const focus_line = focus
@@ -265,7 +276,15 @@ export class LineChart {
         .call((text) =>
           text
             .selectAll('tspan')
-            .data([x_format(x_series[x_index]), line1_series[x_index], line2_series[x_index]])
+            .data(
+              [
+                x_format(x_series[x_index]),
+                line1_series[x_index] ? '收盘价: ' + line1_series[x_index] : null,
+                line2_series[x_index] ? '开盘价: ' + line2_series[x_index] : null,
+                `改价: ${scatter1_series[x_index] || 0}次`,
+                `改库存: ${scatter2_series[x_index] || 0}次`,
+              ].filter((v) => !!v),
+            )
             .join('tspan')
             .attr('x', 0)
             .attr('y', (_, i) => `${i * 1.1}em`)

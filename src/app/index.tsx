@@ -7,13 +7,12 @@ export function App(): JSX.Element {
   const ref = useRef<SVGSVGElement>(null);
   const ref2 = useRef<SVGSVGElement>(null);
   useEffect(() => {
-    LineChart(ref.current);
+    const chart = new LineChart(ref.current);
+    chart.render();
   }, []);
 
   return (
     <div id={'app'}>
-      <p className={styles.myClass}>Hello, Lewin!</p>
-      <p>当前版本为{__NPM_VERSION__}</p>
       <div style={{ border: '1px solid black', fontSize: '12px' }}>
         <svg ref={ref} />
       </div>

@@ -4,7 +4,7 @@ import { aapl } from './LineChart.data';
 const config = {
   width: 500,
   height: 300,
-  heightPartBottom: 100,
+  heightPart2: 100,
   marginTop: 20, // top margin, in pixels
   marginRight: 30, // right margin, in pixels
   marginBottom: 30, // bottom margin, in pixels
@@ -15,190 +15,225 @@ const config = {
   strokeLinecap: 'round', // stroke line cap of line
 };
 
-export function LineChart(elem: SVGSVGElement): void {
-  const data = aapl;
-  const c = config;
-  const svg = d3
-    .select(elem)
-    .attr('width', c.width)
-    .attr('height', c.height)
-    .attr('viewBox', [0, 0, c.width, c.height]);
+export class LineChart {
+  config = config;
+  data = aapl;
+  svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
 
-  // 线条数据
-  const lines_clip = svg
-    .append('defs')
-    .append('svg:clipPath')
-    .attr('id', 'lines_clip')
-    .append('svg:rect')
-    .attr('x', c.marginLeft - 5)
-    .attr('y', c.marginTop - 5)
-    .attr('width', c.width - c.marginLeft - c.marginRight + 10)
-    .attr('height', c.height - c.marginTop - c.marginBottom - c.heightPartBottom + 10);
-  const lines_group = svg.append('g').attr('clip-path', 'url(#lines_clip)');
-  const line1_series = d3.map(data, (d) => d.close);
-  const line2_series = d3.map(data, (d) => d.open);
+  constructor(elem: SVGSVGElement) {
+    const { width, height } = this.config;
+    this.svg = d3.select(elem).attr('width', width).attr('height', height).attr('viewBox', [0, 0, width, height]);
+  }
 
-  // 画 X轴
-  const x_series = d3.map(data, (d) => d.date);
-  const x_domain = d3.extent(x_series);
-  const x_scale = d3.scaleUtc(x_domain, [c.marginLeft, c.width - c.marginRight]);
-  const x_format = d3.timeFormat('%m-%d');
-  const xAxis = d3.axisBottom(x_scale).ticks(c.width / 50, x_format);
-  // .tickSizeOuter(0);
-  svg
-    .append('g')
-    .attr('transform', `translate(0,${c.height - c.marginBottom})`)
-    .style('font-size', 10)
-    .call(xAxis);
+  render(): void {
+    this.render_xAxis();
+    this.render_Part1();
+    this.render_tooltip();
+  }
 
-  // 画 Y轴
-  // const y_series = d3.map(data, (d) => d.close);
-  const y_domain = d3.extent([0, d3.max([d3.max(line1_series), d3.max(line2_series)])]);
-  const y_scale = d3.scaleLinear(y_domain, [c.height - c.marginBottom - c.heightPartBottom, c.marginTop]);
-  const y_axis = d3.axisLeft(y_scale).ticks(c.height / 50, null);
-  svg
-    .append('g')
-    .attr('transform', `translate(${c.marginLeft},0)`)
-    .call(y_axis)
-    .call((g) => g.select('.domain').remove())
-    .call((g) => {
-      g.selectAll('.tick line')
-        .clone()
-        .attr('x2', c.width - c.marginLeft - c.marginRight)
-        .attr('stroke-opacity', 0.1);
-    });
+  private x_series: Date[];
+  private x_scale: d3.ScaleTime<number, number, never>;
+  private x_format: (date: Date) => string;
+  private render_xAxis(): void {
+    const { svg, data, config } = this;
+    const { marginLeft, marginRight, marginBottom, width, height } = config;
 
-  // 画 第一条线
-  const line1_defined = d3.map(data, (d) => d.date && !isNaN(d.close));
-  const line = d3
-    .line<number>()
-    .defined((i) => line1_defined[i])
-    .curve(d3.curveCardinal) // https://github.com/d3/d3/blob/main/API.md#curves
-    .x((i) => x_scale(x_series[i]))
-    .y((i) => y_scale(line1_series[i]));
-  const line1_path = lines_group
-    .append('path')
-    .attr('fill', 'none')
-    .attr('stroke', c.color)
-    .attr('stroke-width', c.strokeWidth)
-    .attr('stroke-linejoin', c.strokeLinejoin)
-    .attr('stroke-linecap', c.strokeLinecap)
-    .attr('d', line(d3.map(data, (_, i) => i)));
-  line1_path
-    .on('pointerenter pointermove', () => {
-      line1_path.attr('stroke-width', c.strokeWidth * 2);
-    })
-    .on('pointerleave', () => {
-      line1_path.attr('stroke-width', c.strokeWidth);
-    });
+    const x_series = (this.x_series = d3.map(data, (d) => d.date));
+    const x_domain = d3.extent(x_series);
+    const x_scale = (this.x_scale = d3.scaleUtc(x_domain, [marginLeft, width - marginRight]));
+    const x_format = (this.x_format = d3.timeFormat('%m-%d'));
+    const xAxis = d3.axisBottom(x_scale).ticks(width / 50, x_format);
+    svg
+      .append('g')
+      .attr('transform', `translate(0,${height - marginBottom})`)
+      .style('font-size', 10)
+      .call(xAxis);
+  }
 
-  // 画 第二条线
-  const line2_defined = d3.map(data, (d) => d.date && !isNaN(d.open));
-  const line2 = d3
-    .line<number>()
-    .defined((i) => line2_defined[i])
-    .curve(d3.curveLinear)
-    .x((i) => x_scale(x_series[i]))
-    .y((i) => y_scale(line2_series[i]));
-  const line2_path = lines_group
-    .append('path')
-    .attr('fill', 'none')
-    .attr('stroke', 'red')
-    .attr('stroke-width', c.strokeWidth)
-    .attr('stroke-linejoin', c.strokeLinejoin)
-    .attr('stroke-linecap', c.strokeLinecap)
-    .attr('d', line2(d3.map(data, (_, i) => i)));
-  line2_path
-    .on('pointerenter pointermove', () => {
-      line2_path.attr('stroke-width', c.strokeWidth * 2);
-    })
-    .on('pointerleave', () => {
-      line2_path.attr('stroke-width', c.strokeWidth);
-    });
+  private line1_series: number[];
+  private line2_series: number[];
+  private render_Part1(): void {
+    const { svg, data, config, x_series, x_scale } = this;
+    const { marginLeft, marginRight, marginTop, marginBottom, width, height, heightPart2 } = config;
+    const c = config;
 
-  /**
-   * 画 tooltip
-   */
-  const focus = svg.append('g');
-  const focus_tooltip = focus.append('g').style('pointer-events', 'none');
-  const focus_line = focus
-    .append('line')
-    .attr('stroke', '#B74779')
-    .attr('stroke-width', '1px')
-    .attr('stroke-dasharray', '3,3')
-    .attr('y1', 0)
-    .attr('y2', c.height);
+    /**
+     * 裁剪区域
+     */
+    const lines_clip = svg
+      .append('defs')
+      .append('svg:clipPath')
+      .attr('id', 'lines_clip')
+      .append('svg:rect')
+      .attr('x', marginLeft)
+      .attr('y', marginTop)
+      .attr('width', width - marginLeft - marginRight)
+      .attr('height', height - marginTop - marginBottom - heightPart2);
+    const lines_group = svg.append('g').attr('clip-path', 'url(#lines_clip)');
 
-  const onPointerMove = (event: PointerEvent) => {
-    const pointer = d3.pointer(event);
-    const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]));
-    focus.attr('transform', `translate(${x_scale(x_series[x_index])},0)`);
-    focus.style('display', null);
+    /**
+     * 线条数据
+     */
+    const line1_series = (this.line1_series = d3.map(data, (d) => d.close));
+    const line2_series = (this.line2_series = d3.map(data, (d) => d.open));
 
-    const path = focus_tooltip
-      .selectAll('path')
-      .data([undefined])
-      .join('path')
-      .attr('fill', 'white')
-      .attr('stroke', 'black');
+    /**
+     * 画 Y轴
+     */
+    const y_domain = d3.extent([0, d3.max([d3.max(line1_series), d3.max(line2_series)])]);
+    const y_scale = d3.scaleLinear(y_domain, [height - marginBottom - heightPart2, marginTop]);
+    const y_axis = d3.axisLeft(y_scale).ticks(height / 50, null);
+    svg
+      .append('g')
+      .attr('transform', `translate(${marginLeft},0)`)
+      .call(y_axis)
+      .call((g) => g.select('.domain').remove())
+      .call((g) => {
+        g.selectAll('.tick line')
+          .clone()
+          .attr('x2', width - marginLeft - marginRight)
+          .attr('stroke-opacity', 0.1);
+      });
 
-    const text = focus_tooltip
-      .selectAll<SVGTextElement, null>('text')
-      .data([undefined])
-      .join('text')
-      .call((text) =>
-        text
-          .selectAll('tspan')
-          .data([x_format(x_series[x_index]), line1_series[x_index], line2_series[x_index]])
-          .join('tspan')
-          .attr('x', 0)
-          .attr('y', (_, i) => `${i * 1.1}em`)
-          .attr('font-weight', (_, i) => (i ? null : 'bold'))
-          .text((d) => d),
-      );
+    /**
+     * 画 第一条线
+     */
+    const line1_defined = d3.map(data, (d) => d.date && !isNaN(d.close));
+    const line = d3
+      .line<number>()
+      .defined((i) => line1_defined[i])
+      .curve(d3.curveLinear) // https://github.com/d3/d3/blob/main/API.md#curves
+      .x((i) => x_scale(x_series[i]))
+      .y((i) => y_scale(line1_series[i]));
+    const line1_path = lines_group
+      .append('path')
+      .attr('fill', 'none')
+      .attr('stroke', c.color)
+      .attr('stroke-width', c.strokeWidth)
+      .attr('stroke-linejoin', c.strokeLinejoin)
+      .attr('stroke-linecap', c.strokeLinecap)
+      .attr('d', line(d3.map(data, (_, i) => i)));
+    line1_path
+      .on('pointerenter pointermove', () => {
+        line1_path.attr('stroke-width', c.strokeWidth * 2);
+      })
+      .on('pointerleave', () => {
+        line1_path.attr('stroke-width', c.strokeWidth);
+      });
 
-    const { x, y, width: w, height: h } = text.node().getBBox(); // 根据text的实际尺寸来计算外边框的尺寸和位置
-    text.attr('transform', `translate(${-w / 2},${15 - y})`);
-    path.attr('d', `M${-w / 2 - 10},5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
-    focus_tooltip.attr('transform', `translate(${w / 2 + 20},${pointer[1]})`);
-    // svg.property('value', line1_series[x_index]).dispatch('input', { bubbles: true });
-  };
+    /**
+     * 画 第二条线
+     */
+    const line2_defined = d3.map(data, (d) => d.date && !isNaN(d.open));
+    const line2 = d3
+      .line<number>()
+      .defined((i) => line2_defined[i])
+      .curve(d3.curveLinear)
+      .x((i) => x_scale(x_series[i]))
+      .y((i) => y_scale(line2_series[i]));
+    const line2_path = lines_group
+      .append('path')
+      .attr('fill', 'none')
+      .attr('stroke', 'red')
+      .attr('stroke-width', c.strokeWidth)
+      .attr('stroke-linejoin', c.strokeLinejoin)
+      .attr('stroke-linecap', c.strokeLinecap)
+      .attr('d', line2(d3.map(data, (_, i) => i)));
+    line2_path
+      .on('pointerenter pointermove', () => {
+        line2_path.attr('stroke-width', c.strokeWidth * 2);
+      })
+      .on('pointerleave', () => {
+        line2_path.attr('stroke-width', c.strokeWidth);
+      });
+  }
 
-  const onPointerLeave = () => {
-    focus.style('display', 'none');
-    // svg.property('value', null).dispatch('input', { bubbles: true });
-  };
-  onPointerLeave();
-  svg
-    .on('pointerenter pointermove', onPointerMove)
-    .on('pointerleave', onPointerLeave)
-    .on('touchstart', (event) => event.preventDefault());
+  private render_tooltip(): void {
+    const { svg, config: c, x_series, x_scale, x_format, line1_series, line2_series } = this;
 
-  /**
-   * 画 线条上的数字
-   */
-  const line1_points_group = lines_group
-    .append('g')
-    .attr('font-family', 'sans-serif')
-    .style('font-size', 10)
-    .attr('text-anchor', 'middle')
-    .attr('stroke-linejoin', 'round')
-    .attr('stroke-linecap', 'round');
-  line1_points_group
-    .selectAll('text')
-    .data(line1_series)
-    .join('text')
-    .attr('dy', '0.35em')
-    .attr('x', (_, index) => x_scale(x_series[index]))
-    .attr('y', (value) => y_scale(value))
-    .text((i) => i);
-  const line2_points_group = line1_points_group.clone();
-  line2_points_group
-    .selectAll('text')
-    .data(line2_series)
-    .join('text')
-    .attr('dy', '0.35em')
-    .attr('x', (_, index) => x_scale(x_series[index]))
-    .attr('y', (value) => y_scale(value))
-    .text((i) => i);
+    const focus = svg.append('g');
+    const focus_line = focus
+      .append('line')
+      .attr('stroke', '#B74779')
+      .attr('stroke-width', '1px')
+      // .attr('stroke-dasharray', '3,3')
+      .attr('y1', 0)
+      .attr('y2', c.height);
+    const focus_tooltip = focus.append('g').style('pointer-events', 'none');
+
+    const onPointerMove = (event: PointerEvent) => {
+      const pointer = d3.pointer(event);
+      const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]));
+      focus.style('display', null);
+      focus_line.attr('transform', `translate(${x_scale(x_series[x_index])},0)`);
+
+      const path = focus_tooltip
+        .selectAll('path')
+        .data([undefined])
+        .join('path')
+        .attr('fill', 'white')
+        .attr('stroke', 'black');
+
+      const text = focus_tooltip
+        .selectAll<SVGTextElement, null>('text')
+        .data([undefined])
+        .join('text')
+        .call((text) =>
+          text
+            .selectAll('tspan')
+            .data([x_format(x_series[x_index]), line1_series[x_index], line2_series[x_index]])
+            .join('tspan')
+            .attr('x', 0)
+            .attr('y', (_, i) => `${i * 1.1}em`)
+            .attr('font-weight', (_, i) => (i ? null : 'bold'))
+            .text((d) => d),
+        );
+
+      const { x, y, width: w, height: h } = text.node().getBBox(); // 根据text的实际尺寸来计算外边框的尺寸和位置
+      text.attr('transform', `translate(${-w / 2},${15 - y})`);
+      path.attr('d', `M${-w / 2 - 10},5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
+      focus_tooltip.attr('transform', `translate(${pointer[0] + w / 2 + 20},${pointer[1] + 10})`);
+      // svg.property('value', line1_series[x_index]).dispatch('input', { bubbles: true });
+    };
+
+    const onPointerLeave = () => {
+      focus.style('display', 'none');
+      // svg.property('value', null).dispatch('input', { bubbles: true });
+    };
+    onPointerLeave();
+    svg
+      .on('pointerenter pointermove', onPointerMove)
+      .on('pointerleave', onPointerLeave)
+      .on('touchstart', (event) => event.preventDefault());
+  }
 }
+
+// export function _LineChart(elem: SVGSVGElement): void {
+//   /**
+//    * 画 线条上的数字
+//    */
+//   const line1_points_group = lines_group
+//     .append('g')
+//     .attr('font-family', 'sans-serif')
+//     .style('font-size', 10)
+//     .attr('text-anchor', 'middle')
+//     .attr('stroke-linejoin', 'round')
+//     .attr('stroke-linecap', 'round');
+//   line1_points_group
+//     .selectAll('text')
+//     .data(line1_series)
+//     .join('text')
+//     .attr('dy', '0.35em')
+//     .attr('x', (_, index) => x_scale(x_series[index]))
+//     .attr('y', (value) => y_scale(value))
+//     .text((i) => i);
+//   const line2_points_group = line1_points_group.clone();
+//   line2_points_group
+//     .selectAll('text')
+//     .data(line2_series)
+//     .join('text')
+//     .attr('dy', '0.35em')
+//     .attr('x', (_, index) => x_scale(x_series[index]))
+//     .attr('y', (value) => y_scale(value))
+//     .text((i) => i);
+// }

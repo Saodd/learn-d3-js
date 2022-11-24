@@ -27,6 +27,7 @@ export type LineChartData<ItemType extends LineChartDataItem = LineChartDataItem
   }[];
 };
 
+const Part1_StrokeWidth = 1.5;
 const Part2_LineHeight = 50;
 const Part2_MarginTop = 50;
 
@@ -64,6 +65,7 @@ export class LineChart<DataType extends LineChartData> {
     svg
       .append('g')
       .attr('transform', `translate(0,${height - marginBottom})`)
+      .style('color', '#666')
       .style('font-size', 10)
       .call(xAxis);
   }
@@ -79,16 +81,7 @@ export class LineChart<DataType extends LineChartData> {
      * 裁剪区域
      */
     const part1_bottom = height - marginBottom - Part2_LineHeight * data.part2.length - Part2_MarginTop;
-    const lines_clip = part1
-      .append('defs')
-      .append('svg:clipPath')
-      .attr('id', 'lines_clip')
-      .append('svg:rect')
-      .attr('x', marginLeft)
-      .attr('y', marginTop)
-      .attr('width', width - marginLeft - marginRight)
-      .attr('height', part1_bottom - marginTop);
-    const lines_group = part1.append('g').attr('clip-path', 'url(#lines_clip)');
+    const lines_group = part1.append('g');
 
     /**
      * 线条数据
@@ -98,12 +91,13 @@ export class LineChart<DataType extends LineChartData> {
     /**
      * 画 Y轴
      */
-    const y_domain = d3.extent([0, d3.max([d3.max(part1_series.map((s) => d3.max(s))) * 1.1, 10])]);
+    const y_domain = d3.extent([0, d3.max([d3.max(part1_series.map((s) => d3.max(s))), 10])]);
     const y_scale = (this.part1_y_scale = d3.scaleLinear(y_domain, [part1_bottom, marginTop]));
     const y_axis = d3.axisLeft(y_scale).ticks(height / 50, null);
     part1
       .append('g')
       .attr('transform', `translate(${marginLeft},0)`)
+      .style('color', '#666')
       .call(y_axis)
       // .call((g) => g.select('.domain').remove())
       .call((g) => {
@@ -117,30 +111,23 @@ export class LineChart<DataType extends LineChartData> {
      * 画 线
      */
     part1_series.forEach((seriesData, index) => {
-      const defaultStrokeWidth = 1.5;
       const seriesConfig = data.part1[index];
       const line_defined = d3.map(seriesData, (d) => !isNaN(d));
       const line = d3
         .line<number>()
         .defined((i) => line_defined[i])
-        .curve(d3.curveLinear) // https://github.com/d3/d3/blob/main/API.md#curves
+        // .curve(d3.curveBumpX) // https://github.com/d3/d3/blob/main/API.md#curves
+        .curve(d3.curveMonotoneX)
         .x((i) => x_scale(x_series[i]))
         .y((i) => y_scale(seriesData[i]));
       const line1_path = lines_group
         .append('path')
         .attr('fill', 'none')
         .attr('stroke', seriesConfig.color)
-        .attr('stroke-width', defaultStrokeWidth)
+        .attr('stroke-width', Part1_StrokeWidth)
         .attr('stroke-linejoin', 'round')
         .attr('stroke-linecap', 'round')
         .attr('d', line(seriesData.map((_, i) => i)));
-      line1_path
-        .on('pointerenter pointermove', () => {
-          line1_path.attr('stroke-width', defaultStrokeWidth * 2);
-        })
-        .on('pointerleave', () => {
-          line1_path.attr('stroke-width', defaultStrokeWidth);
-        });
     });
   }
 
@@ -176,6 +163,7 @@ export class LineChart<DataType extends LineChartData> {
     part2
       .append('g')
       .attr('transform', `translate(${marginLeft},0)`)
+      .style('color', '#666')
       .call(y_axis)
       .call((g) => g.selectAll('.tick text').attr('transform', `translate(0,-${Part2_LineHeight / 2})`));
 
@@ -204,8 +192,9 @@ export class LineChart<DataType extends LineChartData> {
 
     const focus_line = focus
       .append('line')
-      .attr('stroke', '#B74779')
+      .attr('stroke', '#ccc')
       .attr('stroke-width', '1px')
+      .attr('stroke-dasharray', '6 2')
       .attr('y1', 0)
       .attr('y2', c.height);
     const focus_points = focus.append('g');
@@ -219,20 +208,19 @@ export class LineChart<DataType extends LineChartData> {
       focus_line.attr('transform', `translate(${x_line_position},0)`);
       focus_points
         .selectAll('.focus-pointer')
-        .data<{ y: number }>(
+        .data<{ y: number; color: string }>(
           part1_series
-            .map((s) => s[x_index])
-            .filter((y) => !!y)
-            .map((y) => ({ y: part1_y_scale(y) })),
+            .map((s, seriesIndex) => ({ y: part1_y_scale(s[x_index]), color: data.part1[seriesIndex].color }))
+            .filter((item) => !isNaN(item.y)),
         )
         .join('circle') // enter append
         .attr('class', 'focus-pointer')
         .attr('fill', 'white')
-        .attr('stroke-width', '1')
-        .attr('stroke', 'black')
+        .attr('stroke-width', Part1_StrokeWidth)
+        .attr('stroke', (item) => item.color)
         .attr('r', '4') // radius
         .attr('cx', x_line_position) // center x passing through your xScale
-        .attr('cy', (d) => d.y); // center y through your yScale;
+        .attr('cy', (item) => item.y); // center y through your yScale;
 
       const path = focus_tooltip
         .selectAll('path')
@@ -253,7 +241,7 @@ export class LineChart<DataType extends LineChartData> {
                 x_format(x_series[x_index]),
                 ...part1_series.map((s, index) => {
                   const value = s[x_index];
-                  if (value) {
+                  if (!isNaN(value)) {
                     const seriesConfig = data.part1[index];
                     return `${seriesConfig.title}: ${seriesConfig.formatter(value)}`;
                   }

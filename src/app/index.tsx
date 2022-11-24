@@ -3,26 +3,35 @@ import { useEffect, useRef } from 'react';
 import styles from './index.scss';
 import { LineChart, LineChartData } from './LineChart';
 
+class Random {
+  static seed = 1;
+  static random(): number {
+    const x = Math.sin(Random.seed++) * 10000;
+    return x - Math.floor(x);
+  }
+}
+
+const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'];
 const now = new Date('2022-11-23T20:00:00+0800').valueOf();
 const data: LineChartData<{ timestamp: number; people: number; count: number; setPrice?: number; setStock?: number }> =
   {
     items: new Array(100).fill(null).map((v, i) => ({
       timestamp: now + 60000 * i,
-      people: ~~(Math.random() * 100),
-      count: i,
-      setPrice: Math.random() > 0.7 ? 1 : undefined,
-      setStock: Math.random() > 0.8 ? 2 : undefined,
+      people: ~~(Random.random() * 100),
+      count: 10,
+      setPrice: Random.random() > 0.7 ? 1 : undefined,
+      setStock: Random.random() > 0.8 ? 2 : undefined,
     })),
     part1: [
       {
         title: '在线人数',
-        color: 'blue',
+        color: colors[0],
         extractor: (item) => item.people,
         formatter: (v) => v.toString(),
       },
       {
         title: '销量',
-        color: 'red',
+        color: colors[1],
         extractor: (item) => item.count,
         formatter: (v) => v.toString(),
       },
@@ -30,18 +39,21 @@ const data: LineChartData<{ timestamp: number; people: number; count: number; se
     part2: [
       {
         title: '改价',
-        color: 'blue',
+        color: colors[2],
         extractor: (item) => item.setPrice,
         formatter: (v) => v.toString(),
       },
       {
         title: '改库存',
-        color: 'red',
+        color: colors[3],
         extractor: (item) => item.setStock,
         formatter: (v) => v.toString(),
       },
     ],
   };
+data.items[10].count = 20;
+data.items[11].count = 0;
+data.items[20].count = undefined;
 
 export function App(): JSX.Element {
   const ref = useRef<SVGSVGElement>(null);

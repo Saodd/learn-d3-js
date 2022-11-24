@@ -5,6 +5,10 @@ $body-color: red;
 
   border: 1px solid black;
   font-size: 12px;
+
+  svg {
+    user-select: none;
+  }
 }
 
 .tooltip {

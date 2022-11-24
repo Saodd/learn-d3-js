@@ -50,26 +50,71 @@ export class LineChart<DataType extends LineChartData> {
     this.render_Part1();
     this.render_Part2();
     this.render_focus();
+    this.render_brush();
+  }
+
+  private render_brush(): void {
+    const { config: c, data } = this;
+    const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
+
+    const part1_bottom = height - marginBottom - Part2_LineHeight * data.part2.length - Part2_MarginTop;
+    const brush = d3.brushX().extent([
+      // [marginLeft, part1_bottom],
+      // [width - marginRight, height - marginBottom],
+      [0, 0],
+      [width, height],
+    ]);
+
+    const brush_element = this.svg.append('g').attr('class', 'brush').call(brush);
+    brush.on('end', (evt: d3.D3BrushEvent<unknown>) => {
+      const { x_scale, x_series } = this;
+      const selection = evt.selection as [number, number];
+      if (selection) {
+        const domain = [
+          x_series[d3.bisectCenter(x_series, x_scale.invert(selection[0]).valueOf())],
+          x_series[d3.bisectCenter(x_series, x_scale.invert(selection[1]).valueOf())],
+        ]; // 为了取整
+        x_scale.domain(domain);
+        brush_element.call(brush.move, null);
+        this.render_xAxis();
+      } else {
+        // x_scale.domain(d3.extent(x_series));
+      }
+    });
+
+    this.svg.on('dblclick', () => {
+      const { x_scale, x_series } = this;
+      x_scale.domain(d3.extent(x_series));
+      this.render_xAxis();
+    });
   }
 
   private x_series: number[];
   private x_scale: d3.ScaleTime<number, number, never>;
   private x_format: (date: Date | number) => string;
+  private x_axis: d3.Selection<SVGGElement, unknown, null, undefined>;
   private render_xAxis(): void {
-    const { svg, data, config } = this;
+    const { data, config } = this;
     const { marginLeft, marginRight, marginBottom, width, height } = config;
 
-    const x_series = (this.x_series = data.items.map((item) => item.timestamp));
-    const x_scale = (this.x_scale = d3.scaleTime(d3.extent(x_series), [marginLeft, width - marginRight]));
-    const x_format = (this.x_format = d3.timeFormat('%H:%M'));
+    const x_series = (this.x_series ??= data.items.map((item) => item.timestamp));
+    const x_scale = (this.x_scale ??= d3.scaleTime(d3.extent(x_series), [marginLeft, width - marginRight]));
+    const x_format = (this.x_format ??= d3.timeFormat('%H:%M'));
     const defaultTick = ~~(width / 50);
-    const xAxis = d3.axisBottom(x_scale).ticks(x_series.length <= defaultTick ? d3.timeMinute : defaultTick, x_format);
-    svg
-      .append('g')
-      .attr('transform', `translate(0,${height - marginBottom})`)
-      .style('color', '#666')
-      .style('font-size', 10)
-      .call(xAxis);
+    const domain = x_scale.domain();
+    const xAxis = d3
+      .axisBottom(x_scale)
+      .ticks(d3.timeMinute.count(domain[0], domain[1]) <= defaultTick ? d3.timeMinute : defaultTick, x_format);
+    if (!this.x_axis) {
+      this.x_axis = this.svg
+        .append('g')
+        .attr('transform', `translate(0,${height - marginBottom})`)
+        .style('color', '#666')
+        .style('font-size', 10)
+        .call(xAxis);
+    } else {
+      this.x_axis.transition().duration(500).call(xAxis);
+    }
   }
 
   private part1_series: number[][];

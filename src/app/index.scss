@@ -1,5 +1,46 @@
 $body-color: red;
 
-.myClass {
-  color: $body-color;
+.chart {
+  position: relative;
+
+  border: 1px solid black;
+  font-size: 12px;
+}
+
+.tooltip {
+  position: absolute;
+  top: 0;
+  left: 0;
+
+  padding: 10px;
+  border: 1px solid #eee;
+  background-color: white;
+  box-shadow: 1px 1px 4px 1px #ccc;
+
+  font-size: 14px;
+  line-height: 20px;
+
+  b {
+    margin-bottom: 1em;
+  }
+  .tooltipBodyTable {
+    tr td {
+      &:first-of-type {
+        display: flex;
+      }
+
+      &:last-of-type {
+        padding-left: 12px;
+        text-align: end;
+      }
+    }
+  }
+}
+
+.circle {
+  margin: 5px;
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  display: inline-block;
 }

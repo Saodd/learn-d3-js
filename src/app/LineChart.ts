@@ -7,6 +7,8 @@ type LineChartConfig = {
   marginRight: number;
   marginBottom: number;
   marginLeft: number;
+  onPointerMove: (pointer: [number, number], xIndex: number) => void;
+  onPointerLeave: () => void;
 };
 type LineChartDataItem = {
   timestamp: number; // 毫秒
@@ -198,7 +200,6 @@ export class LineChart<DataType extends LineChartData> {
       .attr('y1', 0)
       .attr('y2', c.height);
     const focus_points = focus.append('g');
-    const focus_tooltip = focus.append('g').style('pointer-events', 'none');
 
     const onPointerMove = (event: PointerEvent) => {
       focus.style('display', null);
@@ -222,54 +223,12 @@ export class LineChart<DataType extends LineChartData> {
         .attr('cx', x_line_position) // center x passing through your xScale
         .attr('cy', (item) => item.y); // center y through your yScale;
 
-      const path = focus_tooltip
-        .selectAll('path')
-        .data([undefined])
-        .join('path')
-        .attr('fill', 'white')
-        .attr('stroke', 'black');
-
-      const text = focus_tooltip
-        .selectAll<SVGTextElement, null>('text')
-        .data([undefined])
-        .join('text')
-        .call((text) =>
-          text
-            .selectAll('tspan')
-            .data(
-              [
-                x_format(x_series[x_index]),
-                ...part1_series.map((s, index) => {
-                  const value = s[x_index];
-                  if (!isNaN(value)) {
-                    const seriesConfig = data.part1[index];
-                    return `${seriesConfig.title}: ${seriesConfig.formatter(value)}`;
-                  }
-                  return null;
-                }),
-                ...part2_series.map((s, index) => {
-                  const value = s[x_index];
-                  const seriesConfig = data.part2[index];
-                  return `${seriesConfig.title}: ${seriesConfig.formatter(value || 0)}`;
-                }),
-              ].filter((v) => !!v),
-            )
-            .join('tspan')
-            .attr('x', 0)
-            .attr('y', (_, i) => `${i * 1.1}em`)
-            .attr('font-weight', (_, i) => (i ? null : 'bold'))
-            .text((d) => d),
-        );
-
-      const { x, y, width: w, height: h } = text.node().getBBox(); // 根据text的实际尺寸来计算外边框的尺寸和位置
-      text.attr('transform', `translate(${-w / 2},${15 - y})`);
-      path.attr('d', `M${-w / 2 - 10},5H${w / 2 + 10}v${h + 20}h-${w + 20}z`);
-      focus_tooltip.attr('transform', `translate(${pointer[0] + w / 2 + 20},${pointer[1] + 10})`);
-      // svg.property('value', line1_series[x_index]).dispatch('input', { bubbles: true });
+      c.onPointerMove?.(pointer, x_index);
     };
 
     const onPointerLeave = () => {
       focus.style('display', 'none');
+      c.onPointerLeave?.();
       // svg.property('value', null).dispatch('input', { bubbles: true });
     };
     onPointerLeave();

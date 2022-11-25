@@ -12,7 +12,7 @@ class Random {
 }
 
 const colors = ['#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de'];
-const now = new Date('2022-11-23T20:00:00+0800').valueOf();
+const now = new Date('2022-11-23T09:00:00+0800').valueOf();
 const data: LineChartData<{ timestamp: number; people: number; count: number; setPrice?: number; setStock?: number }> =
   {
     items: new Array(100).fill(null).map((v, i) => ({
@@ -94,7 +94,7 @@ export function App(): JSX.Element {
   const title = useMemo(() => {
     const timestamp = data.items[xIndex].timestamp;
     const dt = new Date(timestamp);
-    return <b>{`${dt.getHours()}:${dt.getMinutes()}`}</b>;
+    return <b>{`${dt.getHours().toString().padStart(2, '0')}:${dt.getMinutes().toString().padStart(2, '0')}`}</b>;
   }, [xIndex]);
   const body = useMemo(() => {
     const item = data.items[xIndex];

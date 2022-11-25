@@ -32,6 +32,7 @@ export type LineChartData<ItemType extends LineChartDataItem = LineChartDataItem
 const Part1_StrokeWidth = 1.5;
 const Part2_LineHeight = 50;
 const Part2_MarginTop = 50;
+const Part2_CircleRadius = 3;
 
 export class LineChart<DataType extends LineChartData> {
   config: LineChartConfig;
@@ -81,6 +82,7 @@ export class LineChart<DataType extends LineChartData> {
         brush_element.call(brush.move, null);
         this.render_xAxis();
         this.render_Part1();
+        this.render_Part2();
       } else {
         // x_scale.domain(d3.extent(x_series));
       }
@@ -93,6 +95,7 @@ export class LineChart<DataType extends LineChartData> {
       x_scale.domain(d3.extent(x_series));
       this.render_xAxis();
       this.render_Part1();
+      this.render_Part2();
     });
   }
 
@@ -234,23 +237,10 @@ export class LineChart<DataType extends LineChartData> {
     }
   }
 
-  private part2_series: number[][];
   private render_Part2(): void {
     const { data, config: c, x_series, x_scale } = this;
     const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
-    const part2 = this.svg.append('g');
-
-    /**
-     * 散点数据
-     */
-    this.part2_series = data.part2.map((line) => data.items.map(line.extractor));
-    const part2_series = this.part2_series.map((seriesData) => {
-      const points: { v: number; i: number }[] = [];
-      seriesData.forEach((v, i) => {
-        if (v) points.push({ v, i });
-      });
-      return points;
-    });
+    const part2 = this.svg.selectAll<SVGGElement, unknown>('.part2').data([undefined]).join('g').attr('class', 'part2');
 
     /**
      * 画 Y轴
@@ -259,34 +249,52 @@ export class LineChart<DataType extends LineChartData> {
     const part2_top = height - marginBottom - part2_length * Part2_LineHeight;
     const part2_bottom = height - marginBottom;
     const y_scale = d3.scaleLinear([0, part2_length], [part2_bottom, part2_top]);
-    const y_axis = d3
-      .axisLeft(y_scale)
-      .tickValues(data.part2.map((_, i) => i)) // https://stackoverflow.com/questions/44872048/d3-js-how-can-i-create-an-axis-with-custom-labels-and-customs-ticks
-      .tickFormat((v) => data.part2[v.valueOf()].title);
-    part2
-      .append('g')
-      .attr('transform', `translate(${marginLeft},0)`)
-      .style('color', '#666')
-      .call(y_axis)
-      .call((g) => g.selectAll('.tick text').attr('transform', `translate(0,-${Part2_LineHeight / 2})`));
+    if (!part2.selectAll('.y_axis').size()) {
+      const y_axis = d3
+        .axisLeft(y_scale)
+        .tickValues(data.part2.map((_, i) => i)) // https://stackoverflow.com/questions/44872048/d3-js-how-can-i-create-an-axis-with-custom-labels-and-customs-ticks
+        .tickFormat((v) => data.part2[v.valueOf()].title);
+      part2
+        .append('g')
+        .attr('class', 'y_axis')
+        .attr('transform', `translate(${marginLeft},0)`)
+        .style('color', '#666')
+        .call(y_axis)
+        .call((g) => g.selectAll('.tick text').attr('transform', `translate(0,-${Part2_LineHeight / 2})`));
+    }
 
     /**
      * 画 散点
      * https://d3-graph-gallery.com/graph/scatter_basic.html
      */
-    part2_series.forEach((seriesData, index) => {
-      const seriesConfig = data.part2[index];
-      part2
-        .append('g')
-        .attr('transform', `translate(0,-${Part2_LineHeight / 2})`)
-        .selectAll('circle')
-        .data(seriesData)
-        .join('circle')
-        .attr('cx', (item) => x_scale(x_series[item.i]))
-        .attr('cy', y_scale(index))
-        .attr('r', 3)
-        .style('fill', seriesConfig.color);
-    });
+    const part2_series_elements = part2
+      .selectAll<SVGGElement, number[]>('.series')
+      .data(data.part2)
+      .join('g')
+      .attr('class', 'series')
+      .attr('transform', (_, i) => `translate(0,${y_scale(i) - Part2_LineHeight / 2})`)
+      .each((seriesConfig, index, groups) => {
+        const { extractor } = seriesConfig;
+        const x_indexes: number[] = [];
+        data.items.forEach((item, i) => {
+          const value = extractor(item);
+          if (value) {
+            x_indexes.push(i);
+          }
+        });
+        const circle_elements = d3
+          .select(groups[index])
+          .selectAll('circle')
+          .data(x_indexes)
+          .join('circle')
+          .attr('cy', 0)
+          .attr('r', Part2_CircleRadius)
+          .style('fill', seriesConfig.color);
+        circle_elements
+          .transition()
+          .duration(500)
+          .attr('cx', (x_index) => x_scale(x_series[x_index]));
+      });
   }
 
   private render_focus(): void {

@@ -53,6 +53,8 @@ export class LineChart<DataType extends LineChartData> {
     this.render_brush();
   }
 
+  private zooming = false;
+  private zooming_x_index: [number, number] = null;
   private render_brush(): void {
     const { config: c, data } = this;
     const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
@@ -67,6 +69,7 @@ export class LineChart<DataType extends LineChartData> {
 
     const brush_element = this.svg.append('g').attr('class', 'brush').call(brush);
     brush.on('end', (evt: d3.D3BrushEvent<unknown>) => {
+      this.zooming = true;
       const { x_scale, x_series } = this;
       const selection = evt.selection as [number, number];
       if (selection) {
@@ -84,6 +87,8 @@ export class LineChart<DataType extends LineChartData> {
     });
 
     this.svg.on('dblclick', () => {
+      this.zooming = false;
+      this.zooming_x_index = null;
       const { x_scale, x_series } = this;
       x_scale.domain(d3.extent(x_series));
       this.render_xAxis();
@@ -177,7 +182,18 @@ export class LineChart<DataType extends LineChartData> {
     /**
      * 画 线
      */
-    part1
+    const part1_series_line_builder = (
+      seriesConfig: DataType['part1'][0],
+      defined: (item: DataType['items'][0], index: number) => boolean,
+    ) => {
+      return d3
+        .line<DataType['items'][0]>()
+        .defined(defined)
+        .curve(d3.curveMonotoneX)
+        .x((item) => x_scale(item.timestamp))
+        .y((item) => y_scale(seriesConfig.extractor(item)));
+    };
+    const part1_series_elements = part1
       .selectAll<SVGPathElement, number[]>('.series')
       .data(data.part1)
       .join('path')
@@ -187,17 +203,35 @@ export class LineChart<DataType extends LineChartData> {
       .attr('stroke-width', Part1_StrokeWidth)
       .attr('stroke-linejoin', 'round')
       .attr('stroke-linecap', 'round')
-      .attr('clip-path', 'url(#part1_clip)')
-      .transition()
-      .duration(500)
-      .attr('d', (seriesConfig, index) => {
-        return d3
-          .line<DataType['items'][0]>()
-          .defined((item) => !isNaN(seriesConfig.extractor(item)))
-          .curve(d3.curveMonotoneX)
-          .x((item) => x_scale(item.timestamp))
-          .y((item) => y_scale(seriesConfig.extractor(item)))(data.items);
+      .attr('clip-path', 'url(#part1_clip)');
+    if (this.zooming) {
+      part1_series_elements
+        .transition()
+        .duration(500)
+        .attr('d', (seriesConfig, i) => {
+          const [z0, z1] = this.zooming_x_index || [0, x_series.length - 1];
+          return part1_series_line_builder(
+            seriesConfig,
+            (item, i) => z0 <= i && i <= z1 && !isNaN(seriesConfig.extractor(item)),
+          )(data.items);
+        })
+        .end()
+        .then(() => {
+          const z0 = d3.max([d3.bisectLeft(x_series, x_domain[0]) - 1, 0]);
+          const z1 = d3.min([d3.bisectRight(x_series, x_domain[1]) + 1, x_series.length - 1]);
+          part1_series_elements.attr('d', (seriesConfig) => {
+            return part1_series_line_builder(
+              seriesConfig,
+              (item, i) => z0 <= i && i <= z1 && !isNaN(seriesConfig.extractor(item)),
+            )(data.items);
+          });
+          this.zooming_x_index = [z0, z1];
+        });
+    } else {
+      part1_series_elements.attr('d', (seriesConfig) => {
+        return part1_series_line_builder(seriesConfig, (item) => !isNaN(seriesConfig.extractor(item)))(data.items);
       });
+    }
   }
 
   private part2_series: number[][];

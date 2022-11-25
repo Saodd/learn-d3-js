@@ -119,7 +119,6 @@ export class LineChart<DataType extends LineChartData> {
     }
   }
 
-  private part1_series: number[][];
   private part1_y_scale: d3.ScaleLinear<number, number, never>;
   private render_Part1(): void {
     const { data, config: c, x_series, x_scale } = this;
@@ -148,7 +147,7 @@ export class LineChart<DataType extends LineChartData> {
      */
     const x_domain = x_scale.domain().map((d) => d.valueOf());
     const items = data.items.filter((item) => item.timestamp >= x_domain[0] && item.timestamp <= x_domain[1]);
-    const part1_series = (this.part1_series = data.part1.map((series) => items.map(series.extractor)));
+    const part1_series = data.part1.map((series) => items.map(series.extractor));
 
     /**
      * 画 Y轴
@@ -257,8 +256,8 @@ export class LineChart<DataType extends LineChartData> {
   }
 
   private render_focus(): void {
-    const { data, config: c, x_series, x_scale, x_format, part1_series, part2_series, part1_y_scale } = this;
-    const focus = this.svg.append('g');
+    const { config: c } = this;
+    const focus = this.svg.append('g').attr('class', 'focus');
 
     const focus_line = focus
       .append('line')
@@ -270,26 +269,24 @@ export class LineChart<DataType extends LineChartData> {
     const focus_points = focus.append('g');
 
     const onPointerMove = (event: PointerEvent) => {
+      const { data, config: c, x_series, x_scale, part1_y_scale } = this;
       focus.style('display', null);
       const pointer = d3.pointer(event);
       const x_index = d3.bisectCenter(x_series, x_scale.invert(pointer[0]).valueOf());
       const x_line_position = x_scale(x_series[x_index]);
+      const x_item = data.items[x_index];
       focus_line.attr('transform', `translate(${x_line_position},0)`);
       focus_points
         .selectAll('.focus-pointer')
-        .data<{ y: number; color: string }>(
-          part1_series
-            .map((s, seriesIndex) => ({ y: part1_y_scale(s[x_index]), color: data.part1[seriesIndex].color }))
-            .filter((item) => !isNaN(item.y)),
-        )
-        .join('circle') // enter append
+        .data(data.part1.filter((seriesConfig) => !isNaN(seriesConfig.extractor(x_item))))
+        .join('circle')
         .attr('class', 'focus-pointer')
         .attr('fill', 'white')
         .attr('stroke-width', Part1_StrokeWidth)
-        .attr('stroke', (item) => item.color)
-        .attr('r', '4') // radius
-        .attr('cx', x_line_position) // center x passing through your xScale
-        .attr('cy', (item) => item.y); // center y through your yScale;
+        .attr('stroke', (seriesConfig) => seriesConfig.color)
+        .attr('r', '4')
+        .attr('cx', x_line_position)
+        .attr('cy', (seriesConfig) => part1_y_scale(seriesConfig.extractor(x_item)));
 
       c.onPointerMove?.(pointer, x_index);
     };

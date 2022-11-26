@@ -31,8 +31,10 @@ export type LineChartData<ItemType extends LineChartDataItem = LineChartDataItem
 
 const Part1_StrokeWidth = 1.5;
 const Part2_LineHeight = 50;
-const Part2_MarginTop = 50;
+const Part2_MarginTop = 20;
 const Part2_CircleRadius = 3;
+const Part3_MarginTop = 20;
+const Part3_Height = 20;
 
 export class LineChart<DataType extends LineChartData> {
   config: LineChartConfig;
@@ -42,10 +44,22 @@ export class LineChart<DataType extends LineChartData> {
     this.data = data;
   }
 
-  private svg: d3.Selection<SVGSVGElement, unknown, null, undefined>;
+  private svg1: d3.Selection<SVGSVGElement, unknown, any, unknown>;
+  private svg2: d3.Selection<SVGSVGElement, unknown, any, unknown>;
   render(elem: SVGSVGElement, config: LineChartConfig): void {
-    const { width, height } = (this.config = config);
-    this.svg = d3.select(elem).attr('width', width).attr('height', height).attr('viewBox', [0, 0, width, height]);
+    const { width, height, marginBottom } = (this.config = config);
+    const svg = d3.select(elem).attr('width', width).attr('height', height).attr('viewBox', [0, 0, width, height]);
+    this.svg1 = svg
+      .append<SVGSVGElement>('svg')
+      .attr('width', width)
+      .attr('height', height - Part3_Height - marginBottom)
+      .attr('viewBox', [0, 0, width, height - Part3_Height - marginBottom]);
+    this.svg2 = svg
+      .append<SVGSVGElement>('svg')
+      .attr('transform', `translate(0,${height - Part3_Height - marginBottom})`)
+      .attr('width', width)
+      .attr('height', Part3_Height + marginBottom)
+      .attr('viewBox', [0, 0, width, Part3_Height + marginBottom]);
 
     this.render_xAxis();
     this.render_Part1();
@@ -54,21 +68,17 @@ export class LineChart<DataType extends LineChartData> {
     this.render_brush();
   }
 
-  private zooming = false;
+  private zooming = true;
   private zooming_x_index: [number, number] = null;
   private render_brush(): void {
     const { config: c, data } = this;
-    const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
 
-    const part1_bottom = height - marginBottom - Part2_LineHeight * data.part2.length - Part2_MarginTop;
     const brush = d3.brushX().extent([
-      // [marginLeft, part1_bottom],
-      // [width - marginRight, height - marginBottom],
       [0, 0],
-      [width, height],
+      [c.width, c.height - Part3_Height - c.marginBottom],
     ]);
 
-    const brush_element = this.svg.append('g').attr('class', 'brush').call(brush);
+    const brush_element = this.svg1.append('g').attr('class', 'brush').call(brush);
     brush.on('end', (evt: d3.D3BrushEvent<unknown>) => {
       this.zooming = true;
       const { x_scale, x_series } = this;
@@ -88,7 +98,7 @@ export class LineChart<DataType extends LineChartData> {
       }
     });
 
-    this.svg.on('dblclick', () => {
+    this.svg1.on('dblclick', () => {
       this.zooming = false;
       this.zooming_x_index = null;
       const { x_scale, x_series } = this;
@@ -103,27 +113,27 @@ export class LineChart<DataType extends LineChartData> {
   private x_scale: d3.ScaleTime<number, number, never>;
   private x_format: (date: Date | number) => string;
   private render_xAxis(): void {
-    const { svg, data, config } = this;
+    const { svg1, data, config } = this;
     const { marginLeft, marginRight, marginBottom, width, height } = config;
 
     const x_series = (this.x_series ??= data.items.map((item) => item.timestamp));
     const x_scale = (this.x_scale ??= d3.scaleTime(d3.extent(x_series), [marginLeft, width - marginRight]));
     const x_format = (this.x_format ??= d3.timeFormat('%H:%M'));
-    const defaultTick = ~~(width / 50);
+    const defaultTick = ~~(width / 80);
     const domain = x_scale.domain();
     const x_axis = d3
       .axisBottom(x_scale)
       .ticks(d3.timeMinute.count(domain[0], domain[1]) <= defaultTick ? d3.timeMinute : defaultTick, x_format);
-    if (!svg.select('.x_axis').size()) {
-      svg
+    if (!svg1.select('.x_axis').size()) {
+      svg1
         .append('g')
         .attr('class', 'x_axis')
-        .attr('transform', `translate(0,${height - marginBottom})`)
+        .attr('transform', `translate(0,${height - marginBottom - Part3_MarginTop - Part3_Height})`)
         .style('color', '#666')
         .style('font-size', 10)
         .call(x_axis);
     } else {
-      svg.select<SVGGElement>('.x_axis').transition().duration(500).call(x_axis);
+      svg1.select<SVGGElement>('.x_axis').transition().duration(500).call(x_axis);
     }
   }
 
@@ -131,12 +141,17 @@ export class LineChart<DataType extends LineChartData> {
   private render_Part1(): void {
     const { data, config: c, x_series, x_scale } = this;
     const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
-    const part1 = this.svg.selectAll<SVGGElement, unknown>('.part1').data([undefined]).join('g').attr('class', 'part1');
+    const part1 = this.svg1
+      .selectAll<SVGGElement, unknown>('.part1')
+      .data([undefined])
+      .join('g')
+      .attr('class', 'part1');
 
     /**
      * 裁剪区域
      */
-    const part1_bottom = height - marginBottom - Part2_LineHeight * data.part2.length - Part2_MarginTop;
+    const part1_bottom =
+      height - marginBottom - Part2_LineHeight * data.part2.length - Part2_MarginTop - Part3_MarginTop - Part3_Height;
     const clip = part1
       .selectAll('clipPath')
       .data([undefined])
@@ -240,14 +255,18 @@ export class LineChart<DataType extends LineChartData> {
   private render_Part2(): void {
     const { data, config: c, x_series, x_scale } = this;
     const { marginLeft, marginRight, marginTop, marginBottom, width, height } = c;
-    const part2 = this.svg.selectAll<SVGGElement, unknown>('.part2').data([undefined]).join('g').attr('class', 'part2');
+    const part2 = this.svg1
+      .selectAll<SVGGElement, unknown>('.part2')
+      .data([undefined])
+      .join('g')
+      .attr('class', 'part2');
 
     /**
      * 画 Y轴
      */
     const part2_length = data.part2.length;
-    const part2_top = height - marginBottom - part2_length * Part2_LineHeight;
-    const part2_bottom = height - marginBottom;
+    const part2_top = height - marginBottom - part2_length * Part2_LineHeight - Part3_MarginTop - Part3_Height;
+    const part2_bottom = height - marginBottom - Part3_MarginTop - Part3_Height;
     const y_scale = d3.scaleLinear([0, part2_length], [part2_bottom, part2_top]);
     if (!part2.selectAll('.y_axis').size()) {
       const y_axis = d3
@@ -299,7 +318,7 @@ export class LineChart<DataType extends LineChartData> {
 
   private render_focus(): void {
     const { config: c } = this;
-    const focus = this.svg.append('g').attr('class', 'focus');
+    const focus = this.svg1.append('g').attr('class', 'focus');
 
     const focus_line = focus
       .append('line')
@@ -339,7 +358,7 @@ export class LineChart<DataType extends LineChartData> {
       // svg.property('value', null).dispatch('input', { bubbles: true });
     };
     onPointerLeave();
-    this.svg
+    this.svg1
       .on('pointerenter pointermove', onPointerMove)
       .on('pointerleave', onPointerLeave)
       .on('touchstart', (event) => event.preventDefault());

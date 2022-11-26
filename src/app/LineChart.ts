@@ -33,7 +33,7 @@ const Part1_StrokeWidth = 1.5;
 const Part2_LineHeight = 50;
 const Part2_MarginTop = 20;
 const Part2_CircleRadius = 3;
-const Part3_MarginTop = 20;
+const Part3_MarginTop = 30;
 const Part3_Height = 20;
 
 export class LineChart<DataType extends LineChartData> {
@@ -56,7 +56,7 @@ export class LineChart<DataType extends LineChartData> {
       .attr('viewBox', [0, 0, width, height - Part3_Height - marginBottom]);
     this.svg2 = svg
       .append<SVGSVGElement>('svg')
-      .attr('transform', `translate(0,${height - Part3_Height - marginBottom})`)
+      .attr('y', height - Part3_Height - marginBottom)
       .attr('width', width)
       .attr('height', Part3_Height + marginBottom)
       .attr('viewBox', [0, 0, width, Part3_Height + marginBottom]);
@@ -66,6 +66,48 @@ export class LineChart<DataType extends LineChartData> {
     this.render_Part2();
     this.render_focus();
     this.render_brush();
+    this.render_Part3();
+  }
+
+  private render_Part3(): void {
+    const { config: c, x_series, x_scale } = this;
+    const part3 = this.svg2.attr('class', 'part3');
+
+    /**
+     * 画时间轴矩形
+     */
+    part3
+      .selectAll('.timeline')
+      .data([undefined])
+      .join('rect')
+      .attr('class', 'timeline')
+      .attr('x', c.marginLeft)
+      .attr('width', c.width - c.marginLeft - c.marginRight)
+      .attr('height', Part3_Height)
+      .attr('rx', 2)
+      .attr('stroke', '#d2dbee')
+      .attr('fill', '#f6f8fc');
+
+    /**
+     * 缩放区域
+     */
+    const x_extent = d3.extent(x_series);
+    const part3_x_scale = d3.scaleTime([x_extent[0], x_extent[1] + 60 * 1000], [c.marginLeft, c.width - c.marginRight]);
+    const domain = x_scale.domain();
+    const x_left = part3_x_scale(domain[0]);
+    const x_right = part3_x_scale(domain[1].valueOf() + 60 * 1000);
+    part3
+      .selectAll('.zoom_range')
+      .data([undefined])
+      .join('rect')
+      .attr('class', 'zoom_range')
+      .attr('height', Part3_Height)
+      .attr('stroke', '#acb8d1')
+      .attr('fill', '#e7efff')
+      .transition()
+      .duration(500)
+      .attr('x', x_left)
+      .attr('width', x_right - x_left);
   }
 
   private zooming = true;
@@ -93,6 +135,7 @@ export class LineChart<DataType extends LineChartData> {
         this.render_xAxis();
         this.render_Part1();
         this.render_Part2();
+        this.render_Part3();
       } else {
         // x_scale.domain(d3.extent(x_series));
       }
@@ -106,6 +149,7 @@ export class LineChart<DataType extends LineChartData> {
       this.render_xAxis();
       this.render_Part1();
       this.render_Part2();
+      this.render_Part3();
     });
   }
 

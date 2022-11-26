@@ -73,7 +73,7 @@ export function App(): JSX.Element {
       height,
       marginTop: 20, // top margin, in pixels
       marginRight: 20, // right margin, in pixels
-      marginBottom: 50, // bottom margin, in pixels
+      marginBottom: 20, // bottom margin, in pixels
       marginLeft: 40, // left margin, in pixels
       onPointerMove: (pointer, xIndex) => {
         setVisible(true);

@@ -68,7 +68,7 @@ export function App(): JSX.Element {
     const width = 800;
 
     const chart = new LineChart(data);
-    chart.render(svgRef.current, {
+    chart.init(svgRef.current, {
       width,
       height,
       marginTop: 20, // top margin, in pixels
@@ -87,6 +87,9 @@ export function App(): JSX.Element {
       },
       onPointerLeave: () => {
         setVisible(false);
+      },
+      onClickTimeline: (ts) => {
+        chart.move_playerCursor(ts);
       },
     });
   }, []);

@@ -9,6 +9,7 @@ type LineChartConfig = {
   marginLeft: number;
   onPointerMove: (pointer: [number, number], xIndex: number) => void;
   onPointerLeave: () => void;
+  onClickTimeline: (timestamp: number) => void;
 };
 type LineChartDataItem = {
   timestamp: number; // 毫秒
@@ -46,7 +47,7 @@ export class LineChart<DataType extends LineChartData> {
 
   private svg1: d3.Selection<SVGSVGElement, unknown, any, unknown>;
   private svg2: d3.Selection<SVGSVGElement, unknown, any, unknown>;
-  render(elem: SVGSVGElement, config: LineChartConfig): void {
+  init(elem: SVGSVGElement, config: LineChartConfig): void {
     const { width, height, marginBottom } = (this.config = config);
     const svg = d3.select(elem).attr('width', width).attr('height', height).attr('viewBox', [0, 0, width, height]);
     this.svg1 = svg
@@ -56,10 +57,10 @@ export class LineChart<DataType extends LineChartData> {
       .attr('viewBox', [0, 0, width, height - Part3_Height - marginBottom]);
     this.svg2 = svg
       .append<SVGSVGElement>('svg')
-      .attr('y', height - Part3_Height - marginBottom)
+      .attr('y', height - Part3_MarginTop - Part3_Height - marginBottom)
       .attr('width', width)
-      .attr('height', Part3_Height + marginBottom)
-      .attr('viewBox', [0, 0, width, Part3_Height + marginBottom]);
+      .attr('height', Part3_MarginTop + Part3_Height + marginBottom)
+      .attr('viewBox', [0, 0, width, Part3_MarginTop + Part3_Height + marginBottom]);
 
     this.render_xAxis();
     this.render_Part1();
@@ -68,10 +69,22 @@ export class LineChart<DataType extends LineChartData> {
     this.render_brush();
     this.render_Part3();
   }
+  update(): void {
+    this.render_xAxis();
+    this.render_Part1();
+    this.render_Part2();
+    this.render_Part3();
+  }
 
+  move_playerCursor: (timestamp: number) => void;
   private render_Part3(): void {
     const { config: c, x_series, x_scale } = this;
-    const part3 = this.svg2.attr('class', 'part3');
+    const part3 = this.svg2
+      .selectAll('.part3')
+      .data([undefined])
+      .join<SVGGElement>('g')
+      .attr('class', 'part3')
+      .style('cursor', 'pointer');
 
     /**
      * 画时间轴矩形
@@ -82,6 +95,7 @@ export class LineChart<DataType extends LineChartData> {
       .join('rect')
       .attr('class', 'timeline')
       .attr('x', c.marginLeft)
+      .attr('y', Part3_MarginTop)
       .attr('width', c.width - c.marginLeft - c.marginRight)
       .attr('height', Part3_Height)
       .attr('rx', 2)
@@ -101,6 +115,7 @@ export class LineChart<DataType extends LineChartData> {
       .data([undefined])
       .join('rect')
       .attr('class', 'zoom_range')
+      .attr('y', Part3_MarginTop)
       .attr('height', Part3_Height)
       .attr('stroke', '#acb8d1')
       .attr('fill', '#e7efff')
@@ -108,6 +123,73 @@ export class LineChart<DataType extends LineChartData> {
       .duration(500)
       .attr('x', x_left)
       .attr('width', x_right - x_left);
+
+    /**
+     * 播放器指针
+     */
+    const playerCursor_element = part3
+      .selectAll('.player_cursor')
+      .data([undefined])
+      .join('rect')
+      .attr('class', 'player_cursor')
+      .attr('y', Part3_MarginTop - 6 / 2)
+      .attr('width', 2)
+      .attr('height', Part3_Height + 6)
+      .attr('fill', '#9eabc7');
+    this.move_playerCursor = (timestamp) => {
+      if (timestamp < x_extent[0] || timestamp > x_extent[1] + 60 * 1000) {
+        playerCursor_element.attr('display', 'none').attr('x', part3_x_scale(x_extent[0]) - 1);
+      } else {
+        playerCursor_element
+          .attr('display', null)
+          .transition()
+          .duration(500)
+          .attr('x', part3_x_scale(timestamp) - 1);
+      }
+    };
+    if (!playerCursor_element.attr('x')) this.move_playerCursor(x_extent[0]);
+
+    /**
+     * 鼠标事件
+     */
+    const pointerCursor_element = part3
+      .selectAll('.pointer_cursor')
+      .data([undefined])
+      .join('rect')
+      .attr('class', 'pointer_cursor')
+      .attr('y', Part3_MarginTop)
+      .attr('width', 1)
+      .attr('height', Part3_Height)
+      .attr('fill', '#acb8d1')
+      .attr('display', 'none');
+    const pointerText_element = part3
+      .selectAll('text')
+      .data([undefined])
+      .join('text')
+      .attr('y', Part3_MarginTop - 1)
+      .attr('font-size', 10)
+      .attr('fill', '#999')
+      .attr('display', 'none');
+    part3.on('pointermove', (event: PointerEvent) => {
+      const pointer = d3.pointer(event);
+      const pointer_timestamp = Math.floor(part3_x_scale.invert(pointer[0]).valueOf() / 1000) * 1000;
+      const pointer_date = new Date(pointer_timestamp);
+      pointerCursor_element.attr('display', null).attr('transform', `translate(${part3_x_scale(pointer_date)},0)`);
+      pointerText_element
+        .attr('display', null)
+        .attr('transform', `translate(${part3_x_scale(pointer_date) - 20},0)`)
+        .text(pointer_date.toLocaleTimeString());
+    });
+    part3.on('pointerleave', () => {
+      pointerCursor_element.attr('display', 'none');
+      pointerText_element.attr('display', 'none');
+    });
+    part3.on('pointerdown', (event: PointerEvent) => {
+      const pointer = d3.pointer(event);
+      const pointer_timestamp = Math.floor(part3_x_scale.invert(pointer[0]).valueOf() / 1000) * 1000;
+      this.config.onClickTimeline(pointer_timestamp);
+      this.svg1.dispatch('dblclick');
+    });
   }
 
   private zooming = true;
@@ -116,8 +198,8 @@ export class LineChart<DataType extends LineChartData> {
     const { config: c, data } = this;
 
     const brush = d3.brushX().extent([
-      [0, 0],
-      [c.width, c.height - Part3_Height - c.marginBottom],
+      [c.marginLeft, c.marginTop],
+      [c.width - c.marginRight, c.height - Part3_MarginTop - Part3_Height - c.marginBottom],
     ]);
 
     const brush_element = this.svg1.append('g').attr('class', 'brush').call(brush);
@@ -132,10 +214,7 @@ export class LineChart<DataType extends LineChartData> {
         ]; // 为了取整
         x_scale.domain(domain);
         brush_element.call(brush.move, null);
-        this.render_xAxis();
-        this.render_Part1();
-        this.render_Part2();
-        this.render_Part3();
+        this.update();
       } else {
         // x_scale.domain(d3.extent(x_series));
       }
@@ -146,10 +225,7 @@ export class LineChart<DataType extends LineChartData> {
       this.zooming_x_index = null;
       const { x_scale, x_series } = this;
       x_scale.domain(d3.extent(x_series));
-      this.render_xAxis();
-      this.render_Part1();
-      this.render_Part2();
-      this.render_Part3();
+      this.update();
     });
   }
 
